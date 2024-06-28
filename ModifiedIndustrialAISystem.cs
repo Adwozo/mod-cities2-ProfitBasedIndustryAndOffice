@@ -118,9 +118,9 @@ namespace ProfitBasedIndustryAndOffice
                     {
                         workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - 3, 15);
                     }
-                    if (workProvider.m_MaxWorkers < 15)
+                    if (workProvider.m_MaxWorkers < fittingWorkers / 4)
                     {
-                        workProvider.m_MaxWorkers = 15;
+                        workProvider.m_MaxWorkers = fittingWorkers / 4;
                     }
 
                     workProviders[i] = workProvider;

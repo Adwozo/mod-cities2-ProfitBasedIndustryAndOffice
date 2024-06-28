@@ -8,14 +8,14 @@
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<!--LongDescription Value="" /-->
 	<LongDescription>
-    This mod introduces different AI system for industrial and office buildings in the game. Key features include:&#xA;&#xA;
+This mod introduces different AI system for industrial and office buildings in the game. Key features include:
 
-    - Companies make expansion and contraction decisions based on their profit-to-worth ratio rather than product storage amount.&#xA;
-    - Considers material costs.&#xA;
-    - Includes safeguards for very small companies.&#xA;&#xA;
+- Companies make expansion and contraction decisions based on their profit-to-worth ratio rather than product storage amount.
+- Considers material costs.
+- Includes safeguards for very small companies.
 
-    This mod aims to create a more dynamic and realistic economic simulation within the game and solve the current issue with the economy update.&#xA;
-    Please give some time for the mod to take effect, as it is using the 45m in game tick rate.&#xA;
+This mod aims to create a more dynamic and realistic economic simulation within the game and solve the current issue with the economy update.
+Please give some time for the mod to take effect.
   </LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
@@ -28,15 +28,15 @@
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="" />
 	<!--Version of the mod-->
-	<ModVersion Value="1.0.3" />
+	<ModVersion Value="1.1.1" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="logic fix, and ticker fix, partial stutter issue fix" />
+	<ChangeLog Value="change min from 15 to building max / 4" />
 	<!--ChangeLog>
 	</ChangeLog-->
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
-	<ExternalLink Type="" Url="" />
+	<ExternalLink Type="github" Url="https://github.com/Adwozo/adwozo-mod-cities-ProfitBasedIndustryAndOffice" />
 </Publish>
