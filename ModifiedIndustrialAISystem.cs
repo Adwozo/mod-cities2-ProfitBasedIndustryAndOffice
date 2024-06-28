@@ -12,10 +12,6 @@ using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Colossal.Logging;
 using Unity.Mathematics;
-using Unity.Jobs;
-using System;
-using Game.Zones;
-using Game.Common;
 
 namespace ProfitBasedIndustryAndOffice
 {
@@ -27,10 +23,6 @@ namespace ProfitBasedIndustryAndOffice
         private EndFrameBarrier m_EndFrameBarrier;
         private SimulationSystem m_SimulationSystem;
         private EntityQuery m_CompanyQuery;
-        private uint m_NextUpdateFrame;
-        private int updatecount;
-        public Boolean isRunning;
-
 
         public static ILog Log => Mod.log;
 
@@ -80,12 +72,12 @@ namespace ProfitBasedIndustryAndOffice
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     Entity entity = entities[i];
-                    if (!PropertyRenters.HasComponent(entity)) continue;
-                    BuildingPropertyData buildingPropertyData = BuildingPropertyDatas[entity];
-                    //if (buildingPropertyData.CountProperties(AreaType.Industrial) <= 0) continue;
-                    Entity property = PropertyRenters[entity].m_Property;
-
                     WorkProvider workProvider = workProviders[i];
+
+                    if (!PropertyRenters.HasComponent(entity)) continue;
+
+                    Entity property = PropertyRenters[entity].m_Property;
+                    bool isOffice = OfficeBuildings.HasComponent(property);
 
                     float companyWorth = EconomyUtils.GetCompanyTotalWorth(resources[i], vehicles[i], Layouts, Trucks, ResourcePrefabs, ResourceDatas);
                     int companyMoney = EconomyUtils.GetResources(Resource.Money, resources[i]);
@@ -94,11 +86,13 @@ namespace ProfitBasedIndustryAndOffice
                     var processData = IndustrialProcessDatas[prefab];
 
                     float materialCost = 0f;
-
-                    materialCost += EconomyUtils.GetTradeCost(processData.m_Input1.m_Resource, tradeCosts[i]).m_BuyCost * processData.m_Input1.m_Amount;
-                    if (processData.m_Input2.m_Resource != Resource.NoResource)
+                    if (!isOffice)
                     {
-                        materialCost += EconomyUtils.GetTradeCost(processData.m_Input2.m_Resource, tradeCosts[i]).m_BuyCost * processData.m_Input2.m_Amount;
+                        materialCost += EconomyUtils.GetTradeCost(processData.m_Input1.m_Resource, tradeCosts[i]).m_BuyCost * processData.m_Input1.m_Amount;
+                        if (processData.m_Input2.m_Resource != Resource.NoResource)
+                        {
+                            materialCost += EconomyUtils.GetTradeCost(processData.m_Input2.m_Resource, tradeCosts[i]).m_BuyCost * processData.m_Input2.m_Amount;
+                        }
                     }
 
                     float profit = companyMoney - materialCost;
@@ -128,45 +122,31 @@ namespace ProfitBasedIndustryAndOffice
                     {
                         workProvider.m_MaxWorkers = 15;
                     }
+
                     workProviders[i] = workProvider;
                 }
-            }
-            void IJobChunk.Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-            {
-                Execute(in chunk, unfilteredChunkIndex, useEnabledMask, in chunkEnabledMask);
             }
         }
 
         protected override void OnCreate()
         {
             base.OnCreate();
-            isRunning = false;
             m_ResourceSystem = World.GetOrCreateSystemManaged<ResourceSystem>();
             m_EndFrameBarrier = World.GetOrCreateSystemManaged<EndFrameBarrier>();
             m_SimulationSystem = World.GetOrCreateSystemManaged<SimulationSystem>();
-
             m_CompanyQuery = GetEntityQuery(
-                ComponentType.Exclude<ServiceAvailable>(),
+                ComponentType.ReadOnly<Game.Companies.ProcessingCompany>(),
                 ComponentType.ReadWrite<WorkProvider>(),
                 ComponentType.ReadOnly<UpdateFrame>(),
-                ComponentType.ReadOnly<PrefabRef>(),
-                ComponentType.ReadOnly<Game.Economy.Resources>(),
-                ComponentType.ReadOnly<Game.Companies.ProcessingCompany>(),
-                ComponentType.ReadOnly<TradeCost>(),
-                ComponentType.Exclude<Created>(),
-                ComponentType.Exclude<Deleted>()
+                ComponentType.Exclude<ServiceAvailable>()
                 );
-
-            m_NextUpdateFrame = SimulationUtils.GetUpdateFrame(m_SimulationSystem.frameIndex, COMPANY_UPDATES_PER_DAY, COMPANY_UPDATE_GROUP_COUNT);
             Log.Info("ModifiedIndustrialAISystem created");
-            Log.Info($"Next CompanyAITickJob, frame: {m_NextUpdateFrame}");
         }
 
         protected override void OnUpdate()
         {
             uint updateFrame = SimulationUtils.GetUpdateFrame(m_SimulationSystem.frameIndex, kUpdatesPerDay, 16);
-            Log.Info($"frame: {updateFrame}");
-            
+
             CompanyAITickJob job = new CompanyAITickJob
             {
                 EntityType = GetEntityTypeHandle(),
@@ -187,20 +167,17 @@ namespace ProfitBasedIndustryAndOffice
                 ResourceDatas = GetComponentLookup<ResourceData>(true),
                 UpdateFrameType = GetSharedComponentTypeHandle<UpdateFrame>(),
                 ResourcePrefabs = m_ResourceSystem.GetPrefabs(),
+                UpdateFrameIndex = updateFrame,
                 CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter()
             };
-            CompanyAITickJob jobData = job;
-            base.Dependency = JobChunkExtensions.ScheduleParallel(jobData, m_CompanyQuery, base.Dependency);
-            m_EndFrameBarrier.AddJobHandleForProducer(base.Dependency);
-            m_ResourceSystem.AddPrefabsReader(base.Dependency);
-        }
 
-        public const int COMPANY_UPDATES_PER_DAY = 32; // Adjust this as needed
-        public const int COMPANY_UPDATE_GROUP_COUNT = 16; // This matches the game's constant
+            Dependency = job.ScheduleParallel(m_CompanyQuery, Dependency);
+            m_EndFrameBarrier.AddJobHandleForProducer(Dependency);
+        }
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
         {
-            return 262144 / (COMPANY_UPDATES_PER_DAY * COMPANY_UPDATE_GROUP_COUNT);
+            return 262144 / (kUpdatesPerDay * 16);
         }
 
         private static int GetFittingWorkers(BuildingData building, BuildingPropertyData properties, int level, IndustrialProcessData processData)
