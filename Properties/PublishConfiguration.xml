@@ -1,0 +1,42 @@
+﻿<Publish>
+	<!--Id must be set in order to update existed mod. it is not required for publishing mod for the first time-->
+	<ModId Value="83825" />
+	<!--Name of the mod to display to players-->
+	<DisplayName Value="Profit Based Industry And Office" />
+	<!--Short description of the mod-->
+	<ShortDescription Value="Modifies industrial and office AI to make decisions based on profit-to-worth ratio." />
+	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
+	<!--LongDescription Value="" /-->
+	<LongDescription>
+    This mod introduces different AI system for industrial and office buildings in the game. Key features include:&#xA;&#xA;
+
+    - Companies make expansion and contraction decisions based on their profit-to-worth ratio rather than product storage amount.&#xA;
+    - Considers material costs.&#xA;
+    - Includes safeguards for very small companies.&#xA;&#xA;
+
+    This mod aims to create a more dynamic and realistic economic simulation within the game and solve the current issue with the economy update.&#xA;
+    Please give some time for the mod to take effect, as it is using the 45m in game tick rate.&#xA;
+  </LongDescription>
+	<!--Thumbnail-->
+	<Thumbnail Value="Properties/Thumbnail.png" />
+	<!--Screenshot, can be set multiple times-->
+	<Screenshot Value="Properties/3d_company_analysis.png" />
+  <Screenshot Value="Properties/before.jpg" />
+  <Screenshot Value="Properties/after.jpg" />
+	<!--Tag, can be set multiple times-->
+	<Tag Value="Code Mod" />
+	<!--Link to the forum post where the mod can be discussed-->
+	<ForumLink Value="" />
+	<!--Version of the mod-->
+	<ModVersion Value="1.0.3" />
+	<!--Recommended version of the base game to use the mod-->
+	<GameVersion Value="1.1.*" />
+	<!--Dependency for the mod, can be set multiple times-->
+	<Dependency Id="" />
+	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
+	<ChangeLog Value="logic fix, and ticker fix, partial stutter issue fix" />
+	<!--ChangeLog>
+	</ChangeLog-->
+	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
+	<ExternalLink Type="" Url="" />
+</Publish>
