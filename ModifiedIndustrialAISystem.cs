@@ -106,13 +106,13 @@ namespace ProfitBasedIndustryAndOffice
                         processData
                     );
 
-                    string logMessage = $"Company: {entity.Index} | Max Workers: {workProvider.m_MaxWorkers} | " +
+                    /**string logMessage = $"Company: {entity.Index} | Max Workers: {workProvider.m_MaxWorkers} | " +
                                         $"Fitting Workers: {fittingWorkers} | Company Money: {companyMoney} | " +
                                         $"Material Cost: {materialCost:F2} | Profit: {profit:F2} | " +
                                         $"Company Worth: {companyWorth:F2} | Profit-to-Worth Ratio: {profitToWorthRatio:F2} | " +
                                         $"Expansion Threshold: {EXPANSION_THRESHOLD:F2} | Contraction Threshold: {CONTRACTION_THRESHOLD:F2}";
 
-                    log.Info(logMessage);
+                    log.Info(logMessage);**/
 
                     if (companyWorth < 1500000)
                     {
