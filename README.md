@@ -1,10 +1,47 @@
-# ProfitBasedIndustryAndOffice
+Feature
 
-This mod introduces different AI system for industrial and office buildings in the game. Key features include:&#xA;&#xA;
+This mod introduces different AI system for industrial and office buildings in the game. Key features include:
 
-    - Companies make expansion and contraction decisions based on their profit-to-worth ratio rather than product storage amount.&#xA;
-    - Considers material costs.&#xA;
-    - Includes safeguards for very small companies.&#xA;&#xA;
+    Companies make expansion and contraction decisions based on their profit-to-worth ratio rather than product storage amount.
+    Considers material costs.
+    Includes safeguards for very small companies.
+    Set minimum company headcount to 1/4 of building capacity
 
-    This mod aims to create a more dynamic and realistic economic simulation within the game and solve the current issue with the economy update.&#xA;
-    Please give some time for the mod to take effect, as it is using the 45m in game tick rate.&#xA;
+Logic
+
+The original in game calculation is as follow
+
+    less than 1/4 amount of storage fill with product, increase headcount
+    more than 1/2 amount of storage fill will product, decrease headcount
+    minimum company headcount is 5
+
+Issue
+
+    Office do not sell any of the product
+
+This mod modify the calculation logic
+
+The profit-to-worth ratio (ptw) is equal to
+
+    for industry (cash reserves - material cost)/company total worth
+    for office cash reserves/company total worth
+
+The mod logic
+
+    if the ptw is larger than the Threshold it will increase headcount and vise versa
+    if the company total worth is smaller than the small company threshold headcount will stay at full
+    minimum company headcount to 1/4 of building capacity
+
+Effect of the mod
+
+    you will see company headcount go to a slightly lower level than pre economy update
+    traffic will increase
+    non profiting company could see decrease headcount
+    tax rate could impact company headcount more dramatically (by logic not verify)
+
+Future plan
+
+    investigate the threshold further to generate a balance
+    create a option for user to define the threshold using percentile
+    small company and threshold would be better as a curve so set as a equation
+

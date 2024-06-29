@@ -12,6 +12,7 @@ using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Colossal.Logging;
 using Unity.Mathematics;
+using System;
 
 namespace ProfitBasedIndustryAndOffice
 {
@@ -24,13 +25,12 @@ namespace ProfitBasedIndustryAndOffice
         private SimulationSystem m_SimulationSystem;
         private EntityQuery m_CompanyQuery;
 
-        public static ILog Log => Mod.log;
+        public static ILog log = LogManager.GetLogger($"{nameof(ProfitBasedIndustryAndOffice)}.Combined.{nameof(ModifiedIndustrialAISystem)}").SetShowsErrorsInUI(false);
 
-        private const float EXPANSION_THRESHOLD = 0.0f;
-        private const float CONTRACTION_THRESHOLD = -0.5f;
+        private const float EXPANSION_THRESHOLD = 0.7f;
+        private const float CONTRACTION_THRESHOLD = 0.4f;
         private const int kUpdatesPerDay = 32;
 
-        [BurstCompile]
         private struct CompanyAITickJob : IJobChunk
         {
             public EntityTypeHandle EntityType;
@@ -106,17 +106,25 @@ namespace ProfitBasedIndustryAndOffice
                         processData
                     );
 
+                    string logMessage = $"Company: {entity.Index} | Max Workers: {workProvider.m_MaxWorkers} | " +
+                                        $"Fitting Workers: {fittingWorkers} | Company Money: {companyMoney} | " +
+                                        $"Material Cost: {materialCost:F2} | Profit: {profit:F2} | " +
+                                        $"Company Worth: {companyWorth:F2} | Profit-to-Worth Ratio: {profitToWorthRatio:F2} | " +
+                                        $"Expansion Threshold: {EXPANSION_THRESHOLD:F2} | Contraction Threshold: {CONTRACTION_THRESHOLD:F2}";
+
+                    log.Info(logMessage);
+
                     if (companyWorth < 1500000)
                     {
                         workProvider.m_MaxWorkers = fittingWorkers;
                     }
                     else if (profitToWorthRatio > EXPANSION_THRESHOLD && workProvider.m_MaxWorkers < fittingWorkers)
                     {
-                        workProvider.m_MaxWorkers = math.min(workProvider.m_MaxWorkers + 3, fittingWorkers);
+                        workProvider.m_MaxWorkers = math.min(workProvider.m_MaxWorkers + 2, fittingWorkers);
                     }
-                    else if (profitToWorthRatio < CONTRACTION_THRESHOLD && workProvider.m_MaxWorkers > 15)
+                    else if (profitToWorthRatio < CONTRACTION_THRESHOLD && workProvider.m_MaxWorkers > fittingWorkers / 4)
                     {
-                        workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - 3, 15);
+                        workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - 3, fittingWorkers / 4);
                     }
                     if (workProvider.m_MaxWorkers < fittingWorkers / 4)
                     {
@@ -140,39 +148,54 @@ namespace ProfitBasedIndustryAndOffice
                 ComponentType.ReadOnly<UpdateFrame>(),
                 ComponentType.Exclude<ServiceAvailable>()
                 );
-            Log.Info("ModifiedIndustrialAISystem created");
+            log.Info("ModifiedIndustrialAISystem created");
         }
 
         protected override void OnUpdate()
         {
-            uint updateFrame = SimulationUtils.GetUpdateFrame(m_SimulationSystem.frameIndex, kUpdatesPerDay, 16);
-
-            CompanyAITickJob job = new CompanyAITickJob
+            try
             {
-                EntityType = GetEntityTypeHandle(),
-                WorkProviderType = GetComponentTypeHandle<WorkProvider>(),
-                ResourceType = GetBufferTypeHandle<Game.Economy.Resources>(true),
-                VehicleType = GetBufferTypeHandle<OwnedVehicle>(true),
-                TradeCostType = GetBufferTypeHandle<TradeCost>(true),
-                EmployeeType = GetBufferTypeHandle<Employee>(true),
-                PropertyRenters = GetComponentLookup<PropertyRenter>(true),
-                Prefabs = GetComponentLookup<PrefabRef>(true),
-                OfficeBuildings = GetComponentLookup<OfficeBuilding>(true),
-                BuildingDatas = GetComponentLookup<BuildingData>(true),
-                BuildingPropertyDatas = GetComponentLookup<BuildingPropertyData>(true),
-                SpawnableBuildingDatas = GetComponentLookup<SpawnableBuildingData>(true),
-                IndustrialProcessDatas = GetComponentLookup<IndustrialProcessData>(true),
-                Layouts = GetBufferLookup<LayoutElement>(true),
-                Trucks = GetComponentLookup<Game.Vehicles.DeliveryTruck>(true),
-                ResourceDatas = GetComponentLookup<ResourceData>(true),
-                UpdateFrameType = GetSharedComponentTypeHandle<UpdateFrame>(),
-                ResourcePrefabs = m_ResourceSystem.GetPrefabs(),
-                UpdateFrameIndex = updateFrame,
-                CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter()
-            };
+                log.Info("OnUpdate: Starting update cycle");
 
-            Dependency = job.ScheduleParallel(m_CompanyQuery, Dependency);
-            m_EndFrameBarrier.AddJobHandleForProducer(Dependency);
+                uint updateFrame = SimulationUtils.GetUpdateFrame(m_SimulationSystem.frameIndex, kUpdatesPerDay, 16);
+                log.Info($"Current update frame: {updateFrame}");
+
+                log.Info("Scheduling CompanyAITickJob");
+                CompanyAITickJob job = new CompanyAITickJob
+                {
+                    EntityType = GetEntityTypeHandle(),
+                    WorkProviderType = GetComponentTypeHandle<WorkProvider>(),
+                    ResourceType = GetBufferTypeHandle<Game.Economy.Resources>(true),
+                    VehicleType = GetBufferTypeHandle<OwnedVehicle>(true),
+                    TradeCostType = GetBufferTypeHandle<TradeCost>(true),
+                    EmployeeType = GetBufferTypeHandle<Employee>(true),
+                    PropertyRenters = GetComponentLookup<PropertyRenter>(true),
+                    Prefabs = GetComponentLookup<PrefabRef>(true),
+                    OfficeBuildings = GetComponentLookup<OfficeBuilding>(true),
+                    BuildingDatas = GetComponentLookup<BuildingData>(true),
+                    BuildingPropertyDatas = GetComponentLookup<BuildingPropertyData>(true),
+                    SpawnableBuildingDatas = GetComponentLookup<SpawnableBuildingData>(true),
+                    IndustrialProcessDatas = GetComponentLookup<IndustrialProcessData>(true),
+                    Layouts = GetBufferLookup<LayoutElement>(true),
+                    Trucks = GetComponentLookup<Game.Vehicles.DeliveryTruck>(true),
+                    ResourceDatas = GetComponentLookup<ResourceData>(true),
+                    UpdateFrameType = GetSharedComponentTypeHandle<UpdateFrame>(),
+                    ResourcePrefabs = m_ResourceSystem.GetPrefabs(),
+                    UpdateFrameIndex = updateFrame,
+                    CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter()
+                };
+
+                Dependency = job.ScheduleParallel(m_CompanyQuery, Dependency);
+
+                log.Info("Adding job handles to EndFrameBarrier");
+                m_EndFrameBarrier.AddJobHandleForProducer(Dependency);
+
+                log.Info("OnUpdate completed successfully");
+            }
+            catch (Exception e)
+            {
+                log.Error($"Exception in OnUpdate: {e.Message}\n{e.StackTrace}");
+            }
         }
 
         public override int GetUpdateInterval(SystemUpdatePhase phase)
