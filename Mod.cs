@@ -4,7 +4,6 @@ using Game;
 using Game.Modding;
 using Game.SceneFlow;
 using Unity.Entities;
-using Game.Simulation;
 using System;
 
 namespace ProfitBasedIndustryAndOffice
@@ -13,6 +12,8 @@ namespace ProfitBasedIndustryAndOffice
     {
         public static ILog log = LogManager.GetLogger($"{nameof(ProfitBasedIndustryAndOffice)}.{nameof(Mod)}").SetShowsErrorsInUI(false);
         private Setting m_Setting;
+        private World m_SimulationWorld;
+        private SystemHandle m_SellCompanyProductSystemHandle;
 
         public void OnLoad(UpdateSystem updateSystem)
         {
@@ -27,8 +28,12 @@ namespace ProfitBasedIndustryAndOffice
 
             AssetDatabase.global.LoadSettings(nameof(ProfitBasedIndustryAndOffice), m_Setting, new Setting(this));
 
-            // Register your modified system
+            // Get the simulation world
+            m_SimulationWorld = World.DefaultGameObjectInjectionWorld;
+
+            // Register systems
             RegisterModifiedSystem(updateSystem);
+            RegisterSellCompanyProductSystem(updateSystem);
         }
 
         private void RegisterModifiedSystem(UpdateSystem updateSystem)
@@ -45,6 +50,24 @@ namespace ProfitBasedIndustryAndOffice
             }
         }
 
+        private void RegisterSellCompanyProductSystem(UpdateSystem updateSystem)
+        {
+            try
+            {
+                // Create and add the SellCompanyProductSystem to the simulation world
+                m_SellCompanyProductSystemHandle = m_SimulationWorld.CreateSystem<SellCompanyProductSystem>();
+
+                // Register the system with the update system
+                updateSystem.UpdateAt<SellCompanyProductSystem>(SystemUpdatePhase.GameSimulation);
+
+                log.Info("SellCompanyProductSystem added to simulation world");
+            }
+            catch (Exception e)
+            {
+                log.Error($"Failed to register SellCompanyProductSystem: {e.Message}");
+            }
+        }
+
         public void OnDispose()
         {
             log.Info(nameof(OnDispose));
@@ -54,7 +77,15 @@ namespace ProfitBasedIndustryAndOffice
                 m_Setting = null;
             }
 
-            // Cleanup for your system is not needed here as the game will handle system disposal
+            // Remove the SellCompanyProductSystem from the simulation world
+            if (m_SimulationWorld != null && m_SellCompanyProductSystemHandle != default)
+            {
+                m_SimulationWorld.DestroySystem(m_SellCompanyProductSystemHandle);
+                m_SellCompanyProductSystemHandle = default;
+                log.Info("SellCompanyProductSystem removed from simulation world");
+            }
+
+            // Cleanup for ModifiedIndustrialAISystem is not needed here as the game will handle system disposal
         }
     }
 }
