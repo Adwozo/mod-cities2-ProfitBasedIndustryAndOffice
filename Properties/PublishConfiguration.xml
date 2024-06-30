@@ -13,7 +13,6 @@
       <List>
         <Item>Companies make expansion and contraction decisions based on their profit-to-worth ratio rather than product storage amount.</Item>
         <Item>Considers material costs.</Item>
-        <Item>Includes safeguards for very small companies.</Item>
         <Item>Set minimum company headcount to 1/4 of building capacity</Item>
         <Item>Added system to sell company product to outside city (graph still dont update as of now)</Item>
       </List>
@@ -91,13 +90,13 @@
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/profit-based-industry-and-office.1692457/" />
 	<!--Version of the mod-->
-	<ModVersion Value="1.2.3" />
+	<ModVersion Value="1.2.4" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="adjust office sell system, bug fix" />
+	<ChangeLog Value="remove small company protection" />
 	<!--ChangeLog>
 	</ChangeLog-->
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
