@@ -36,7 +36,7 @@ namespace ProfitBasedIndustryAndOffice
         private NativeQueue<VirtualExportEvent> m_ExportQueue;
 
         private const int kUpdatesPerDay = 32;
-        private const int MINIMAL_EXPORT_AMOUNT = 1000;
+        private const int MINIMAL_EXPORT_AMOUNT = 200;
 
         private struct VirtualExportEvent
         {
@@ -104,11 +104,17 @@ namespace ProfitBasedIndustryAndOffice
                         {
                             var resource = resources[j];
                             int totalAmount = resource.m_Amount;
+                            int exportAmount = totalAmount;
 
-                            if (resource.m_Resource == outputResource)
-                            {
-                                int exportAmount = totalAmount;
-
+                            if (
+                                (
+                                    resource.m_Resource == outputResource
+                                ) || (
+                                    hasNegativeMoney &&
+                                    (resource.m_Resource == input1Resource ||
+                                    (input2Resource != Resource.NoResource && resource.m_Resource == input2Resource))
+                                )
+                            ){
                                 //log.Info($"Entity {entity.Index}: Resource {resource.m_Resource}, Total: {totalAmount}, Buffer: {bufferAmount}, Export: {exportAmount}");
 
                                 if (exportAmount > MINIMAL_EXPORT_AMOUNT)
@@ -117,20 +123,7 @@ namespace ProfitBasedIndustryAndOffice
                                     ExportQueue.Enqueue(new VirtualExportEvent
                                     {
                                         m_Seller = entity,
-                                        m_Amount = exportAmount,
-                                        m_Resource = resource.m_Resource
-                                    });
-                                }
-                            }
-                            else if (hasNegativeMoney &&
-                                (resource.m_Resource == input1Resource ||
-                                (input2Resource != Resource.NoResource && resource.m_Resource == input2Resource)))
-                            {
-                                {
-                                    ExportQueue.Enqueue(new VirtualExportEvent
-                                    {
-                                        m_Seller = entity,
-                                        m_Amount = math.min(totalAmount,1000),
+                                        m_Amount = math.min(exportAmount, 1000),
                                         m_Resource = resource.m_Resource
                                     });
                                 }
