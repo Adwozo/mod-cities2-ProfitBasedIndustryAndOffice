@@ -113,12 +113,7 @@ namespace ProfitBasedIndustryAndOffice
                                         $"Expansion Threshold: {EXPANSION_THRESHOLD:F2} | Contraction Threshold: {CONTRACTION_THRESHOLD:F2}";
 
                     log.Info(logMessage);**/
-
-                    if (companyWorth < 1500000)
-                    {
-                        workProvider.m_MaxWorkers = fittingWorkers;
-                    }
-                    else if (profitToWorthRatio > EXPANSION_THRESHOLD && workProvider.m_MaxWorkers < fittingWorkers)
+                    if (profitToWorthRatio > EXPANSION_THRESHOLD && workProvider.m_MaxWorkers < fittingWorkers)
                     {
                         workProvider.m_MaxWorkers = math.min(workProvider.m_MaxWorkers + 2, fittingWorkers);
                     }
