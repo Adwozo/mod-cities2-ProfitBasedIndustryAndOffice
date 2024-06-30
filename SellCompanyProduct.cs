@@ -78,16 +78,13 @@ namespace ProfitBasedIndustryAndOffice
 
                         var processData = IndustrialProcessDatas[prefabRef.m_Prefab];
                         var outputResource = processData.m_Output.m_Resource;
+                        var input1Resource = processData.m_Input1.m_Resource;
+                        var input2Resource = processData.m_Input2.m_Resource;
                         //log.Info($"Processing entity {entity.Index} in chunk {unfilteredChunkIndex}");
 
                         for (int j = 0; j < resources.Length; j++)
                         {
                             var resource = resources[j];
-
-                            // Skip non outputResource
-                            if (resource.m_Resource != outputResource)
-                                continue;
-
                             int totalAmount = resource.m_Amount;
                             int bufferAmount = (int)(totalAmount * BUFFER_PERCENTAGE);
                             int exportAmount = totalAmount - bufferAmount;
@@ -103,6 +100,19 @@ namespace ProfitBasedIndustryAndOffice
                                     m_Amount = exportAmount,
                                     m_Resource = resource.m_Resource
                                 });
+                            }
+                            else if (
+                                resource.m_Resource == input1Resource ||
+                                (input2Resource != Resource.NoResource && resource.m_Resource == input2Resource)
+                                ) {
+                                if (totalAmount > 1000) {
+                                    ExportQueue.Enqueue(new VirtualExportEvent
+                                    {
+                                        m_Seller = entity,
+                                        m_Amount = exportAmount,
+                                        m_Resource = resource.m_Resource
+                                    });
+                                }
                             }
                         }
                     }
