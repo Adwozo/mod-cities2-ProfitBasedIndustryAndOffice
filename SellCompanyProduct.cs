@@ -19,6 +19,7 @@ using Colossal.Logging;
 using Game.Tools;
 using Game;
 using Unity.Burst.Intrinsics;
+using static Game.Prefabs.TriggerPrefabData;
 
 namespace ProfitBasedIndustryAndOffice
 {
@@ -49,6 +50,8 @@ namespace ProfitBasedIndustryAndOffice
         {
             [ReadOnly] public EntityTypeHandle EntityType;
             [ReadOnly] public BufferTypeHandle<Resources> ResourcesType;
+            [ReadOnly] public ComponentTypeHandle<PrefabRef> PrefabRefType;
+            [ReadOnly] public ComponentLookup<IndustrialProcessData> IndustrialProcessDatas;
             [ReadOnly] public ResourcePrefabs ResourcePrefabs;
             [ReadOnly] public ComponentLookup<ResourceData> ResourceDatas;
             public NativeQueue<VirtualExportEvent>.ParallelWriter ExportQueue;
@@ -62,31 +65,28 @@ namespace ProfitBasedIndustryAndOffice
 
                     var entities = chunk.GetNativeArray(EntityType);
                     var resourceBuffers = chunk.GetBufferAccessor(ref ResourcesType);
+                    var prefabRefs = chunk.GetNativeArray(ref PrefabRefType);
 
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         var entity = entities[i];
                         var resources = resourceBuffers[i];
+                        var prefabRef = prefabRefs[i];
 
+                        if (!IndustrialProcessDatas.HasComponent(prefabRef.m_Prefab))
+                            continue;
+
+                        var processData = IndustrialProcessDatas[prefabRef.m_Prefab];
+                        var outputResource = processData.m_Output.m_Resource;
                         //log.Info($"Processing entity {entity.Index} in chunk {unfilteredChunkIndex}");
 
                         for (int j = 0; j < resources.Length; j++)
                         {
                             var resource = resources[j];
 
-                            // Skip money and resources with non-zero weight
-                            if (resource.m_Resource == Resource.Money || !ResourceDatas.HasComponent(ResourcePrefabs[resource.m_Resource]))
-                            {
+                            // Skip non outputResource
+                            if (resource.m_Resource != outputResource)
                                 continue;
-                            }
-
-                            float weight = EconomyUtils.GetWeight(resource.m_Resource, ResourcePrefabs, ref ResourceDatas);
-
-                            // Only process resources with exactly zero weight
-                            if (math.abs(weight) > float.Epsilon)
-                            {
-                                continue;
-                            }
 
                             int totalAmount = resource.m_Amount;
                             int bufferAmount = (int)(totalAmount * BUFFER_PERCENTAGE);
@@ -213,10 +213,11 @@ namespace ProfitBasedIndustryAndOffice
                 {
                     EntityType = GetEntityTypeHandle(),
                     ResourcesType = GetBufferTypeHandle<Resources>(true),
+                    PrefabRefType = GetComponentTypeHandle<PrefabRef>(true),
+                    IndustrialProcessDatas = GetComponentLookup<IndustrialProcessData>(true),
                     ResourcePrefabs = m_ResourceSystem.GetPrefabs(),
                     ResourceDatas = GetComponentLookup<ResourceData>(true),
-                    ExportQueue = m_ExportQueue.AsParallelWriter(),
-                    CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter()
+                    ExportQueue = m_ExportQueue.AsParallelWriter()
                 };
 
                 log.Info("Scheduling VirtualExportJob");
