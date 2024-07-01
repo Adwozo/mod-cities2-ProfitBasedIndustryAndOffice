@@ -77,26 +77,21 @@ namespace ProfitBasedIndustryAndOffice
                     if (!PropertyRenters.HasComponent(entity)) continue;
 
                     Entity property = PropertyRenters[entity].m_Property;
-                    bool isOffice = OfficeBuildings.HasComponent(property);
 
-                    float companyWorth = EconomyUtils.GetCompanyTotalWorth(resources[i], vehicles[i], Layouts, Trucks, ResourcePrefabs, ResourceDatas);
                     int companyMoney = EconomyUtils.GetResources(Resource.Money, resources[i]);
 
                     Entity prefab = Prefabs[entity].m_Prefab;
                     var processData = IndustrialProcessDatas[prefab];
 
                     float materialCost = 0f;
-                    if (!isOffice)
+
+                    materialCost += EconomyUtils.GetTradeCost(processData.m_Input1.m_Resource, tradeCosts[i]).m_BuyCost * processData.m_Input1.m_Amount;
+                    if (processData.m_Input2.m_Resource != Resource.NoResource)
                     {
-                        materialCost += EconomyUtils.GetTradeCost(processData.m_Input1.m_Resource, tradeCosts[i]).m_BuyCost * processData.m_Input1.m_Amount;
-                        if (processData.m_Input2.m_Resource != Resource.NoResource)
-                        {
-                            materialCost += EconomyUtils.GetTradeCost(processData.m_Input2.m_Resource, tradeCosts[i]).m_BuyCost * processData.m_Input2.m_Amount;
-                        }
+                        materialCost += EconomyUtils.GetTradeCost(processData.m_Input2.m_Resource, tradeCosts[i]).m_BuyCost * processData.m_Input2.m_Amount;
                     }
 
-                    float profit = companyMoney - materialCost;
-                    float profitToWorthRatio = profit / companyWorth;
+                    float companyFreeCash = companyMoney - materialCost;
 
                     Entity prefab2 = Prefabs[property].m_Prefab;
                     int fittingWorkers = GetFittingWorkers(
@@ -113,13 +108,13 @@ namespace ProfitBasedIndustryAndOffice
                                         $"Expansion Threshold: {EXPANSION_THRESHOLD:F2} | Contraction Threshold: {CONTRACTION_THRESHOLD:F2}";
 
                     log.Info(logMessage);**/
-                    if (profitToWorthRatio > EXPANSION_THRESHOLD && workProvider.m_MaxWorkers < fittingWorkers)
+                    if (companyFreeCash > 0 && workProvider.m_MaxWorkers < fittingWorkers)
                     {
-                        workProvider.m_MaxWorkers = math.min(workProvider.m_MaxWorkers + 2, fittingWorkers);
+                        workProvider.m_MaxWorkers = math.min(workProvider.m_MaxWorkers + 1, fittingWorkers);
                     }
-                    else if (profitToWorthRatio < CONTRACTION_THRESHOLD && workProvider.m_MaxWorkers > fittingWorkers / 4)
+                    else if (companyFreeCash < 0 && workProvider.m_MaxWorkers > fittingWorkers / 4)
                     {
-                        workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - 3, fittingWorkers / 4);
+                        workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - 2, fittingWorkers / 4);
                     }
                     if (workProvider.m_MaxWorkers < fittingWorkers / 4)
                     {
@@ -189,7 +184,7 @@ namespace ProfitBasedIndustryAndOffice
             }
             catch (Exception e)
             {
-                log.Error($"Exception in OnUpdate: {e.Message}\n{e.StackTrace}");
+                log.Info($"Exception in OnUpdate: {e.Message}\n{e.StackTrace}");
             }
         }
 
