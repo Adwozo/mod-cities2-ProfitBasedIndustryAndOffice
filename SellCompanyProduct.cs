@@ -293,8 +293,6 @@ namespace ProfitBasedIndustryAndOffice
 
                         EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
                         EconomyUtils.AddResources(Resource.Money, -importPrice, buyerBuffer);
-
-                        SellCompanyProductSystem.log.Info($"External transfer (import): Resource {item.m_Resource}, Amount {item.m_Amount}, Import Price {importPrice}, Buyer {item.m_Buyer.Index}, Industrial Price {priceX}, Service Price {priceY}, Market Price {marketPrice}");
                     }
                     else if (Resources.HasBuffer(item.m_Seller) && Resources.HasBuffer(item.m_Buyer))
                     {
@@ -309,8 +307,6 @@ namespace ProfitBasedIndustryAndOffice
 
                         EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
                         EconomyUtils.AddResources(Resource.Money, -price, buyerBuffer);
-
-                        SellCompanyProductSystem.log.Info($"Internal transfer: Resource {item.m_Resource}, Amount {item.m_Amount}, Price {price}, Seller {item.m_Seller.Index}, Buyer {item.m_Buyer.Index}, Industrial Price {priceX}, Service Price {priceY}, Market Price {marketPrice}");
                     }
                     else if (Resources.HasBuffer(item.m_Seller))
                     {
@@ -322,16 +318,8 @@ namespace ProfitBasedIndustryAndOffice
 
                         EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, resourceBuffer);
                         EconomyUtils.AddResources(Resource.Money, sellerPrice, resourceBuffer);
-
-                        SellCompanyProductSystem.log.Info($"External transfer (export): Resource {item.m_Resource}, Amount {item.m_Amount}, Base Price {marketPrice}, Seller Price {sellerPrice}, Seller {item.m_Seller.Index}, Industrial Price {priceX}, Service Price {priceY}, Market Price {marketPrice}");
-                    }
-                    else
-                    {
-                        SellCompanyProductSystem.log.Info($"Invalid transfer: Seller {item.m_Seller.Index} does not have a resource buffer. Resource {item.m_Resource}, Industrial Price {priceX}, Service Price {priceY}, Market Price {marketPrice}");
                     }
                 }
-
-                SellCompanyProductSystem.log.Info($"Processed {processedEvents} events. Internal transfers: {internalTransfers}, External transfers: {externalTransfers}, Import transfers: {importTransfers}");
             }
         }
 

@@ -4,76 +4,56 @@
 	<!--Name of the mod to display to players-->
 	<DisplayName Value="Profit Based Industry And Office (PBIAO)" />
 	<!--Short description of the mod-->
-	<ShortDescription Value="Modifies industrial and office AI to make decisions based on profit-to-worth ratio." />
+	<ShortDescription Value="Modifies industrial and office AI to make decisions based on profit." />
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<!--LongDescription Value="" /-->
 	<LongDescription>
-    <Section>
-      <Heading>This mod introduces different AI system for industrial and office buildings in the game. Key features include:</Heading>
-      <List>
-        <Item>Companies make expansion and contraction decisions based on their profit-to-worth ratio rather than product storage amount.</Item>
-        <Item>Considers material costs.</Item>
-        <Item>Set minimum company headcount to 1/4 of building capacity</Item>
-        <Item>Added system to sell company product to outside city (graph still dont update as of now)</Item>
-      </List>
-    </Section>
+    # Profit Based Industry And Office
+    This mod introduces different AI system for industrial and office buildings in the game.
 
-    <Section>
-      <Heading>Logic</Heading>
-      <SubSection>
-        <Heading>The original in game calculation is as follow</Heading>
-        <List>
-          <Item>less than 1/4 amount of storage fill with product, increase headcount</Item>
-          <Item>more than 1/2 amount of storage fill will product, decrease headcount</Item>
-          <Item>minimum company headcount is 5</Item>
-        </List>
-      </SubSection>
+    ## Key features:
 
-      <SubSection>
-        <Heading>Issue</Heading>
-        <List>
-          <Item>Office do not sell any of the product</Item>
-        </List>
-      </SubSection>
+    - Companies make expansion and contraction decisions based on their profit rather than product storage amount.
+    - Considers material costs.
+    - Set minimum company headcount to 1/4 of building capacity
+    - Added system to sell company product to internal demand and outside city(graph still dont update as of now)
+    - More organic growth of company
 
-      <SubSection>
-        <Heading>This mod modify the calculation logic</Heading>
-        <Paragraph>The profit-to-worth ratio (PTW) is equal to</Paragraph>
-        <List>
-          <Item>for industry (cash reserves - material cost)/company total worth</Item>
-          <Item>for office cash reserves/company total worth</Item>
-        </List>
-      </SubSection>
+    ## Logic
 
-      <SubSection>
-        <Heading>The mod logic</Heading>
-        <List>
-          <Item>if the PTW is larger than the Threshold it will increase headcount and vise versa</Item>
-          <Item>if the company total worth is smaller than the small company threshold headcount will stay at full</Item>
-          <Item>minimum company headcount to 1/4 of building capacity</Item>
-        </List>
-      </SubSection>
-    </Section>
+    ### The original in game calculation is as follow
 
-    <Section>
-      <Heading>Effect of the mod</Heading>
-      <List>
-        <Item>you will see company headcount go to a slightly lower level than pre economy update</Item>
-        <Item>traffic will increase</Item>
-        <Item>non profiting company could see decrease headcount</Item>
-        <Item>tax rate could impact company headcount more dramatically (by logic not verify)</Item>
-        <Item>company will now sell product to the global market. (cant do inter city transaction yet)</Item>
-      </List>
-    </Section>
+    - less than 1/4 amount of storage fill with product, increase headcount
+    - more than 1/2 amount of storage fill will product, decrease headcount
+    - minimum company headcount is 5
 
-    <Section>
-      <Heading>Future plan</Heading>
-      <List>
-        <Item>investigate the threshold further to generate a balance</Item>
-        <Item>create a option for user to define the threshold using percentile</Item>
-        <Item>small company and threshold would be better as a curve so set as a equation</Item>
-      </List>
-    </Section>
+    ### Issue
+
+    - Office do not sell any of the product
+
+    ### The mod logic
+
+    - if the profit is larger than the Threshold it will increase headcount and vise versa
+    - output will fullfield internal demand with no mark up, export and import will have mark up on the price and mark down on the profit
+    - minimum company headcount to 1/4 of building capacity
+
+    ## Effect of the mod
+
+    - you will see company headcount go to a slightly lower level than pre economy update
+    - traffic will increase
+    - non profiting company could see decrease headcount
+    - tax rate could impact company headcount more dramatically (by logic not verify)
+    - company will now sell product to the global market. (cant do inter city transaction yet)
+
+    ## Future plan
+
+    - investigate the threshold further to generate a balance
+    - create a option for user to define the threshold using percentile
+
+    This mod may initial cause lag with huge population cities, but the lag will ease off after sometime as the updated calculation are done to most building.
+
+    Thanks to @Mimonsi and @Infixo . your code in github help me alot in understand how many of the function works.
+    
   </LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Image/Thumbnail.png" />
@@ -90,13 +70,13 @@
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/profit-based-industry-and-office.1692457/" />
 	<!--Version of the mod-->
-	<ModVersion Value="1.2.5" />
+	<ModVersion Value="1.3.0" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.1.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="bug fix" />
+	<ChangeLog Value="add system to fullfill internal demand first, and add markup or down for external city input and output for office" />
 	<!--ChangeLog>
 	</ChangeLog-->
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
