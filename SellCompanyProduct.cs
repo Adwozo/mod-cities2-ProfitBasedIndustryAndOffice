@@ -19,12 +19,12 @@ using Colossal.Logging;
 using Game.Tools;
 using Game;
 using Unity.Burst.Intrinsics;
-using static Game.Prefabs.TriggerPrefabData;
 
 namespace ProfitBasedIndustryAndOffice
 {
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateBefore(typeof(ResourceExporterSystem))]
+    [UpdateBefore(typeof(ResourceBuyerSystem))]
     public partial class SellCompanyProductSystem : GameSystemBase
     {
         public static ILog log = LogManager.GetLogger($"{nameof(ProfitBasedIndustryAndOffice)}.Combined.{nameof(SellCompanyProductSystem)}").SetShowsErrorsInUI(false);
@@ -34,17 +34,86 @@ namespace ProfitBasedIndustryAndOffice
         private EndFrameBarrier m_EndFrameBarrier;
         private SimulationSystem m_SimulationSystem;
         private NativeQueue<VirtualExportEvent> m_ExportQueue;
+        private NativeQueue<ResourceNeed> m_ResourceNeedQueue;
 
         private const int kUpdatesPerDay = 32;
         private const int MINIMAL_EXPORT_AMOUNT = 200;
+
+        private struct ResourceNeed
+        {
+            public Resource Resource;
+            public Entity Company;
+            public int Amount;
+        }
 
         private struct VirtualExportEvent
         {
             public Resource m_Resource;
             public Entity m_Seller;
+            public Entity m_Buyer;
             public int m_Amount;
         }
 
+        [BurstCompile]
+        private struct CreateResourceMapJob : IJobChunk
+        {
+            [ReadOnly] public EntityTypeHandle EntityType;
+            [ReadOnly] public BufferTypeHandle<Resources> ResourcesType;
+            [ReadOnly] public ComponentTypeHandle<PrefabRef> PrefabRefType;
+            [ReadOnly] public ComponentLookup<IndustrialProcessData> IndustrialProcessDatas;
+            [ReadOnly] public ResourcePrefabs ResourcePrefabs;
+            [ReadOnly] public ComponentLookup<ResourceData> ResourceDatas;
+
+            public NativeQueue<ResourceNeed>.ParallelWriter ResourceNeedQueue;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var entities = chunk.GetNativeArray(EntityType);
+                var resourceBuffers = chunk.GetBufferAccessor(ref ResourcesType);
+                var prefabRefs = chunk.GetNativeArray(ref PrefabRefType);
+
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var entity = entities[i];
+                    var resources = resourceBuffers[i];
+                    var prefabRef = prefabRefs[i];
+
+                    if (!IndustrialProcessDatas.HasComponent(prefabRef.m_Prefab))
+                        continue;
+
+                    var processData = IndustrialProcessDatas[prefabRef.m_Prefab];
+                    var outputResource = processData.m_Output.m_Resource;
+
+                    // Check if the output resource has a weight of 0 (office product)
+                    if (ResourceDatas[ResourcePrefabs[outputResource]].m_Weight != 0)
+                        continue;
+
+                    var input1Resource = processData.m_Input1.m_Resource;
+                    var input2Resource = processData.m_Input2.m_Resource;
+
+                    for (int j = 0; j < resources.Length; j++)
+                    {
+                        var resource = resources[j];
+                        if (resource.m_Resource == input1Resource ||
+                            (input2Resource != Resource.NoResource && resource.m_Resource == input2Resource))
+                        {
+                            int amountNeeded = processData.m_Input1.m_Amount - resource.m_Amount;
+                            if (amountNeeded > 0)
+                            {
+                                ResourceNeedQueue.Enqueue(new ResourceNeed
+                                {
+                                    Resource = resource.m_Resource,
+                                    Company = entity,
+                                    Amount = amountNeeded
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        [BurstCompile]
         private struct VirtualExportJob : IJobChunk
         {
             [ReadOnly] public EntityTypeHandle EntityType;
@@ -55,91 +124,144 @@ namespace ProfitBasedIndustryAndOffice
             [ReadOnly] public ComponentLookup<ResourceData> ResourceDatas;
             public NativeQueue<VirtualExportEvent>.ParallelWriter ExportQueue;
             public EntityCommandBuffer.ParallelWriter CommandBuffer;
+            [ReadOnly] public NativeArray<ResourceNeed> ResourceNeeds;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                try
+                var entities = chunk.GetNativeArray(EntityType);
+                var resourceBuffers = chunk.GetBufferAccessor(ref ResourcesType);
+                var prefabRefs = chunk.GetNativeArray(ref PrefabRefType);
+
+                for (int i = 0; i < chunk.Count; i++)
                 {
-                    //log.Info($"VirtualExportJob: Starting processing for chunk {unfilteredChunkIndex}");
+                    var entity = entities[i];
+                    var resources = resourceBuffers[i];
+                    var prefabRef = prefabRefs[i];
 
-                    var entities = chunk.GetNativeArray(EntityType);
-                    var resourceBuffers = chunk.GetBufferAccessor(ref ResourcesType);
-                    var prefabRefs = chunk.GetNativeArray(ref PrefabRefType);
+                    if (!IndustrialProcessDatas.HasComponent(prefabRef.m_Prefab))
+                        continue;
 
-                    for (int i = 0; i < chunk.Count; i++)
+                    var processData = IndustrialProcessDatas[prefabRef.m_Prefab];
+                    var outputResource = processData.m_Output.m_Resource;
+
+                    if (ResourceDatas[ResourcePrefabs[outputResource]].m_Weight != 0)
+                        continue;
+
+                    var input1Resource = processData.m_Input1.m_Resource;
+                    var input2Resource = processData.m_Input2.m_Resource;
+
+                    bool hasNegativeMoney = false;
+                    for (int j = 0; j < resources.Length; j++)
                     {
-                        var entity = entities[i];
-                        var resources = resourceBuffers[i];
-                        var prefabRef = prefabRefs[i];
-
-                        if (!IndustrialProcessDatas.HasComponent(prefabRef.m_Prefab))
-                            continue;
-
-                        var processData = IndustrialProcessDatas[prefabRef.m_Prefab];
-                        var outputResource = processData.m_Output.m_Resource;
-
-                        // Check if the output resource has a weight of 0 (office product)
-                        if (ResourceDatas[ResourcePrefabs[outputResource]].m_Weight != 0)
-                            continue;
-
-                        var input1Resource = processData.m_Input1.m_Resource;
-                        var input2Resource = processData.m_Input2.m_Resource;
-
-                        //log.Info($"Processing entity {entity.Index} in chunk {unfilteredChunkIndex}");
-
-                        // Check if the company has negative money
-                        bool hasNegativeMoney = false;
-                        for (int j = 0; j < resources.Length; j++)
+                        if (resources[j].m_Resource == Resource.Money)
                         {
-                            if (resources[j].m_Resource == Resource.Money) {
-                                if (resources[j].m_Amount < 0)
-                                {
-                                    hasNegativeMoney = true;
-                                }
-                                break;
+                            if (resources[j].m_Amount < 0)
+                            {
+                                hasNegativeMoney = true;
                             }
-                        }
-
-                        for (int j = 0; j < resources.Length; j++)
-                        {
-                            var resource = resources[j];
-                            int totalAmount = resource.m_Amount;
-                            int exportAmount = totalAmount;
-
-                            if (
-                                (
-                                    resource.m_Resource == outputResource
-                                ) || (
-                                    hasNegativeMoney &&
-                                    (resource.m_Resource == input1Resource ||
-                                    (input2Resource != Resource.NoResource && resource.m_Resource == input2Resource))
-                                )
-                            ){
-                                //log.Info($"Entity {entity.Index}: Resource {resource.m_Resource}, Total: {totalAmount}, Buffer: {bufferAmount}, Export: {exportAmount}");
-
-                                if (exportAmount > MINIMAL_EXPORT_AMOUNT)
-                                {
-                                    //log.Info($"Enqueueing export event for entity {entity.Index}: resource: {resource.m_Resource}, amount: {exportAmount}");
-                                    ExportQueue.Enqueue(new VirtualExportEvent
-                                    {
-                                        m_Seller = entity,
-                                        m_Amount = math.min(exportAmount, 1000),
-                                        m_Resource = resource.m_Resource
-                                    });
-                                }
-                            }
+                            break;
                         }
                     }
 
-                    //log.Info($"VirtualExportJob: Finished processing for chunk {unfilteredChunkIndex}");
+                    for (int j = 0; j < resources.Length; j++)
+                    {
+                        var resource = resources[j];
+                        int totalAmount = resource.m_Amount;
+                        int exportAmount = totalAmount;
+
+                        if ((resource.m_Resource == outputResource) || (hasNegativeMoney &&
+                            (resource.m_Resource == input1Resource ||
+                            (input2Resource != Resource.NoResource && resource.m_Resource == input2Resource))))
+                        {
+                            // Check resource needs
+                            for (int k = 0; k < ResourceNeeds.Length && exportAmount > 0; k++)
+                            {
+                                var need = ResourceNeeds[k];
+                                if (need.Resource == resource.m_Resource && need.Amount > 0)
+                                {
+                                    int amountToTransfer = math.min(exportAmount, need.Amount);
+                                    if (amountToTransfer > 0)
+                                    {
+                                        ExportQueue.Enqueue(new VirtualExportEvent
+                                        {
+                                            m_Seller = entity,
+                                            m_Buyer = need.Company,
+                                            m_Amount = amountToTransfer,
+                                            m_Resource = resource.m_Resource
+                                        });
+                                        exportAmount -= amountToTransfer;
+
+                                        // Update or remove the ResourceNeed
+                                        if (amountToTransfer == need.Amount)
+                                        {
+                                            // Mark as invalid by setting Resource to Resource.NoResource
+                                            ResourceNeeds[k] = new ResourceNeed
+                                            {
+                                                Resource = Resource.NoResource,
+                                                Company = Entity.Null,
+                                                Amount = 0
+                                            };
+                                        }
+                                        else
+                                        {
+                                            ResourceNeeds[k] = new ResourceNeed
+                                            {
+                                                Resource = need.Resource,
+                                                Company = need.Company,
+                                                Amount = need.Amount - amountToTransfer
+                                            };
+                                        }
+
+                                        if (exportAmount <= 0)
+                                        {
+                                            break; // All available resources have been exported
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Export remaining amount if any
+                            if (exportAmount > MINIMAL_EXPORT_AMOUNT)
+                            {
+                                ExportQueue.Enqueue(new VirtualExportEvent
+                                {
+                                    m_Seller = entity,
+                                    m_Amount = math.min(exportAmount, 1000),
+                                    m_Resource = resource.m_Resource
+                                });
+                            }
+                        }
+                    }
                 }
-                catch (Exception e)
+                // Remove ResourceNeeds with null company Entities, create import events for remaining needs, and create a new list
+                for (int i = 0; i < ResourceNeeds.Length; i++)
                 {
-                    log.Error($"Exception in VirtualExportJob for chunk {unfilteredChunkIndex}: {e.Message}\n{e.StackTrace}");
+                    if (ResourceNeeds[i].Company != Entity.Null)
+                    {
+                        if (ResourceNeeds[i].Amount > 0)
+                        {
+                            // Create an import event for the remaining need
+                            float basePrice = EconomyUtils.GetMarketPrice(ResourceNeeds[i].Resource, ResourcePrefabs, ref ResourceDatas);
+                            float buyerMarkup = 1.25f; // 25% markup for imports
+                            int importPrice = UnityEngine.Mathf.RoundToInt(basePrice * ResourceNeeds[i].Amount * buyerMarkup);
+
+                            ExportQueue.Enqueue(new VirtualExportEvent
+                            {
+                                m_Seller = Entity.Null, // Null entity represents import from outside the city
+                                m_Buyer = ResourceNeeds[i].Company,
+                                m_Amount = ResourceNeeds[i].Amount,
+                                m_Resource = ResourceNeeds[i].Resource
+                            });
+
+                            // Log the import event
+                            SellCompanyProductSystem.log.Info($"Import event created: Resource {ResourceNeeds[i].Resource}, Amount {ResourceNeeds[i].Amount}, Import Price {importPrice}, Buyer {ResourceNeeds[i].Company.Index}");
+                        }
+                    }
                 }
             }
         }
 
+        // Remove the BurstCompile attribute to disable Burst compilation
         private struct HandleVirtualExportsJob : IJob
         {
             public BufferLookup<Resources> Resources;
@@ -149,33 +271,65 @@ namespace ProfitBasedIndustryAndOffice
 
             public void Execute()
             {
-                //log.Info("Starting HandleVirtualExportsJob");
                 int processedEvents = 0;
+                int internalTransfers = 0;
+                int externalTransfers = 0;
+                int importTransfers = 0;
 
                 while (ExportQueue.TryDequeue(out VirtualExportEvent item))
                 {
                     processedEvents++;
-                    //log.Info($"Processing export event {processedEvents}: Resource {item.m_Resource}, Amount {item.m_Amount}");
-
-                    if (Resources.HasBuffer(item.m_Seller))
+                    if (item.m_Seller == Entity.Null && Resources.HasBuffer(item.m_Buyer))
                     {
-                        var resourceBuffer = Resources[item.m_Seller];
+                        // Import event
+                        importTransfers++;
+                        var buyerBuffer = Resources[item.m_Buyer];
+                        float basePrice = EconomyUtils.GetMarketPrice(item.m_Resource, ResourcePrefabs, ref ResourceDatas);
+                        float buyerMarkup = 1.25f; // 25% markup for imports
+                        int importPrice = UnityEngine.Mathf.RoundToInt(basePrice * item.m_Amount * buyerMarkup);
+
+                        EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
+                        EconomyUtils.AddResources(Resource.Money, -importPrice, buyerBuffer);
+
+                        SellCompanyProductSystem.log.Info($"Import transfer: Resource {item.m_Resource}, Amount {item.m_Amount}, Import Price {importPrice}, Buyer {item.m_Buyer.Index}");
+                    }
+                    else if (Resources.HasBuffer(item.m_Seller) && Resources.HasBuffer(item.m_Buyer))
+                    {
+                        // Internal transfer
+                        internalTransfers++;
+                        var sellerBuffer = Resources[item.m_Seller];
+                        var buyerBuffer = Resources[item.m_Buyer];
                         int price = UnityEngine.Mathf.RoundToInt(EconomyUtils.GetMarketPrice(item.m_Resource, ResourcePrefabs, ref ResourceDatas) * item.m_Amount);
 
-                        //log.Info($"Exporting resource: {item.m_Resource}, Amount: {item.m_Amount}, Price: {price}");
+                        EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, sellerBuffer);
+                        EconomyUtils.AddResources(Resource.Money, price, sellerBuffer);
+
+                        EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
+                        EconomyUtils.AddResources(Resource.Money, -price, buyerBuffer);
+
+                        SellCompanyProductSystem.log.Info($"Internal transfer: Resource {item.m_Resource}, Amount {item.m_Amount}, Price {price}, Seller {item.m_Seller.Index}, Buyer {item.m_Buyer.Index}");
+                    }
+                    else if (Resources.HasBuffer(item.m_Seller))
+                    {
+                        // External transfer (export)
+                        externalTransfers++;
+                        var resourceBuffer = Resources[item.m_Seller];
+                        float basePrice = EconomyUtils.GetMarketPrice(item.m_Resource, ResourcePrefabs, ref ResourceDatas);
+                        float sellerMarkdown = 0.75f; // 25% markdown for seller
+                        int sellerPrice = UnityEngine.Mathf.RoundToInt(basePrice * item.m_Amount * sellerMarkdown);
 
                         EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, resourceBuffer);
-                        EconomyUtils.AddResources(Resource.Money, price, resourceBuffer);
+                        EconomyUtils.AddResources(Resource.Money, sellerPrice, resourceBuffer);
 
-                        //log.Info($"Export completed for entity {item.m_Seller.Index}");
+                        SellCompanyProductSystem.log.Info($"External transfer (export): Resource {item.m_Resource}, Amount {item.m_Amount}, Base Price {basePrice}, Seller Price {sellerPrice}, Seller {item.m_Seller.Index}");
                     }
                     else
                     {
-                        log.Info($"[WARNING] Entity {item.m_Seller.Index} does not have a resource buffer");
+                        SellCompanyProductSystem.log.Info($"Invalid transfer: Seller {item.m_Seller.Index} does not have a resource buffer");
                     }
                 }
 
-                //log.Info($"HandleVirtualExportsJob completed. Processed {processedEvents} events.");
+                SellCompanyProductSystem.log.Info($"Processed {processedEvents} events. Internal transfers: {internalTransfers}, External transfers: {externalTransfers}, Import transfers: {importTransfers}");
             }
         }
 
@@ -189,6 +343,7 @@ namespace ProfitBasedIndustryAndOffice
             m_EndFrameBarrier = World.GetOrCreateSystemManaged<EndFrameBarrier>();
             m_SimulationSystem = World.GetOrCreateSystemManaged<SimulationSystem>();
             m_ExportQueue = new NativeQueue<VirtualExportEvent>(Allocator.Persistent);
+            m_ResourceNeedQueue = new NativeQueue<ResourceNeed>(Allocator.Persistent);
 
             m_CompanyQuery = GetEntityQuery(
                 ComponentType.ReadOnly<Game.Companies.ProcessingCompany>(),
@@ -214,6 +369,7 @@ namespace ProfitBasedIndustryAndOffice
             log.Info("OnDestroy: Cleaning up SellCompanyProductSystem");
             base.OnDestroy();
             m_ExportQueue.Dispose();
+            m_ResourceNeedQueue.Dispose();
             log.Info("OnDestroy: SellCompanyProductSystem cleaned up successfully");
         }
 
@@ -233,6 +389,24 @@ namespace ProfitBasedIndustryAndOffice
                 uint updateFrame = SimulationUtils.GetUpdateFrame(m_SimulationSystem.frameIndex, kUpdatesPerDay, 16);
                 log.Info($"Current update frame: {updateFrame}");
 
+                var createResourceMapJob = new CreateResourceMapJob
+                {
+                    EntityType = GetEntityTypeHandle(),
+                    ResourcesType = GetBufferTypeHandle<Resources>(true),
+                    PrefabRefType = GetComponentTypeHandle<PrefabRef>(true),
+                    IndustrialProcessDatas = GetComponentLookup<IndustrialProcessData>(true),
+                    ResourcePrefabs = m_ResourceSystem.GetPrefabs(),
+                    ResourceDatas = GetComponentLookup<ResourceData>(true),
+                    ResourceNeedQueue = m_ResourceNeedQueue.AsParallelWriter()
+                };
+
+                log.Info("Scheduling CreateResourceMapJob");
+                Dependency = createResourceMapJob.ScheduleParallel(m_CompanyQuery, Dependency);
+
+                Dependency.Complete(); // We need to complete the job to access the queue
+
+                NativeArray<ResourceNeed> resourceNeeds = m_ResourceNeedQueue.ToArray(Allocator.TempJob);
+
                 var virtualExportJob = new VirtualExportJob
                 {
                     EntityType = GetEntityTypeHandle(),
@@ -241,7 +415,9 @@ namespace ProfitBasedIndustryAndOffice
                     IndustrialProcessDatas = GetComponentLookup<IndustrialProcessData>(true),
                     ResourcePrefabs = m_ResourceSystem.GetPrefabs(),
                     ResourceDatas = GetComponentLookup<ResourceData>(true),
-                    ExportQueue = m_ExportQueue.AsParallelWriter()
+                    ExportQueue = m_ExportQueue.AsParallelWriter(),
+                    CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter(),
+                    ResourceNeeds = resourceNeeds
                 };
 
                 log.Info("Scheduling VirtualExportJob");
@@ -258,6 +434,9 @@ namespace ProfitBasedIndustryAndOffice
                 log.Info("Scheduling HandleVirtualExportsJob");
                 Dependency = handleVirtualExportsJob.Schedule(Dependency);
 
+                // Dispose the temporary array
+                Dependency = resourceNeeds.Dispose(Dependency);
+
                 log.Info("Adding job handles to EndFrameBarrier");
                 m_EndFrameBarrier.AddJobHandleForProducer(Dependency);
 
@@ -265,7 +444,7 @@ namespace ProfitBasedIndustryAndOffice
             }
             catch (Exception e)
             {
-                log.Error($"Exception in OnUpdate: {e.Message}\n{e.StackTrace}");
+                log.Info($"Exception in OnUpdate: {e.Message}\n{e.StackTrace}");
             }
         }
 

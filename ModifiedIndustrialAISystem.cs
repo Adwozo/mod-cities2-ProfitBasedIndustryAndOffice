@@ -31,6 +31,7 @@ namespace ProfitBasedIndustryAndOffice
         private const float CONTRACTION_THRESHOLD = 0.4f;
         private const int kUpdatesPerDay = 32;
 
+        [BurstCompile]
         private struct CompanyAITickJob : IJobChunk
         {
             public EntityTypeHandle EntityType;
@@ -189,7 +190,7 @@ namespace ProfitBasedIndustryAndOffice
             }
             catch (Exception e)
             {
-                log.Error($"Exception in OnUpdate: {e.Message}\n{e.StackTrace}");
+                log.Info($"Exception in OnUpdate: {e.Message}\n{e.StackTrace}");
             }
         }
 
