@@ -6,7 +6,7 @@ using Game.SceneFlow;
 using Unity.Entities;
 using System;
 
-namespace ProfitBasedIndustryAndOffice
+namespace ProfitBasedIndustryAndOffice.ModSystem
 {
     public class Mod : IMod
     {

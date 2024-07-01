@@ -19,8 +19,9 @@ using Colossal.Logging;
 using Game.Tools;
 using Game;
 using Unity.Burst.Intrinsics;
+using ProfitBasedIndustryAndOffice.Prefabs;
 
-namespace ProfitBasedIndustryAndOffice
+namespace ProfitBasedIndustryAndOffice.ModSystem
 {
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateBefore(typeof(ResourceExporterSystem))]
@@ -53,6 +54,7 @@ namespace ProfitBasedIndustryAndOffice
             public Entity m_Seller;
             public Entity m_Buyer;
             public int m_Amount;
+            public int m_CurrentCashHolding;
         }
 
         private struct CreateResourceMapJob : IJobChunk
@@ -149,6 +151,8 @@ namespace ProfitBasedIndustryAndOffice
                     var input1Resource = processData.m_Input1.m_Resource;
                     var input2Resource = processData.m_Input2.m_Resource;
 
+                    var currentCashHolding = 0;
+
                     bool hasNegativeMoney = false;
                     for (int j = 0; j < resources.Length; j++)
                     {
@@ -158,6 +162,7 @@ namespace ProfitBasedIndustryAndOffice
                             {
                                 hasNegativeMoney = true;
                             }
+                            currentCashHolding = resources[j].m_Amount;
                             break;
                         }
                     }
@@ -193,7 +198,8 @@ namespace ProfitBasedIndustryAndOffice
                                             m_Seller = entity,
                                             m_Buyer = need.Company,
                                             m_Amount = amountToTransfer,
-                                            m_Resource = resource.m_Resource
+                                            m_Resource = resource.m_Resource,
+                                            m_CurrentCashHolding = currentCashHolding,
                                         });
                                         exportAmount -= amountToTransfer;
 
@@ -269,6 +275,8 @@ namespace ProfitBasedIndustryAndOffice
 
             public void Execute()
             {
+                var companyFinancialsMap = CompanyFinancialsManager.GetCompanyFinancialsMap();
+
                 int processedEvents = 0;
                 int internalTransfers = 0;
                 int externalTransfers = 0;
@@ -317,6 +325,20 @@ namespace ProfitBasedIndustryAndOffice
 
                         EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, resourceBuffer);
                         EconomyUtils.AddResources(Resource.Money, sellerPrice, resourceBuffer);
+                    }
+
+                    if (companyFinancialsMap.TryGetValue(item.m_Seller, out CompanyFinancials financials))
+                    {
+                        financials.CurrentCashHolding = item.m_CurrentCashHolding;
+                        companyFinancialsMap[item.m_Seller] = financials;
+                    }
+                    else
+                    {
+                        companyFinancialsMap[item.m_Seller] = new CompanyFinancials
+                        {
+                            CurrentCashHolding = item.m_CurrentCashHolding,
+                            LastExportEventCashHolding = item.m_CurrentCashHolding
+                        };
                     }
                 }
             }

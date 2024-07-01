@@ -14,7 +14,7 @@ using Colossal.Logging;
 using Unity.Mathematics;
 using System;
 
-namespace ProfitBasedIndustryAndOffice
+namespace ProfitBasedIndustryAndOffice.ModSystem
 {
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(IndustrialAISystem))]
