@@ -288,8 +288,7 @@ namespace ProfitBasedIndustryAndOffice
                         // Import event
                         importTransfers++;
                         var buyerBuffer = Resources[item.m_Buyer];
-                        float buyerMarkup = 1.075f; // 10% markup for imports
-                        int importPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount * buyerMarkup);
+                        int importPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount);
 
                         EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
                         EconomyUtils.AddResources(Resource.Money, -importPrice, buyerBuffer);
@@ -300,21 +299,21 @@ namespace ProfitBasedIndustryAndOffice
                         internalTransfers++;
                         var sellerBuffer = Resources[item.m_Seller];
                         var buyerBuffer = Resources[item.m_Buyer];
-                        int price = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount);
+                        int buyPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount * 0.9f);
+                        int sellPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount * 1.1f);
 
                         EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, sellerBuffer);
-                        EconomyUtils.AddResources(Resource.Money, price, sellerBuffer);
+                        EconomyUtils.AddResources(Resource.Money, sellPrice, sellerBuffer);
 
                         EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
-                        EconomyUtils.AddResources(Resource.Money, -price, buyerBuffer);
+                        EconomyUtils.AddResources(Resource.Money, -buyPrice, buyerBuffer);
                     }
                     else if (Resources.HasBuffer(item.m_Seller))
                     {
                         // External transfer (export)
                         externalTransfers++;
                         var resourceBuffer = Resources[item.m_Seller];
-                        float sellerMarkdown = 0.925f; // 10% markdown for seller
-                        int sellerPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount * sellerMarkdown);
+                        int sellerPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount);
 
                         EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, resourceBuffer);
                         EconomyUtils.AddResources(Resource.Money, sellerPrice, resourceBuffer);
