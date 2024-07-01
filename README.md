@@ -1,13 +1,17 @@
-This mod introduces different AI system for industrial and office buildings in the game. Key features include:
+https://mods.paradoxplaza.com/mods/83825/Windows
 
-    Companies make expansion and contraction decisions based on their profit-to-worth ratio rather than product storage amount.
+Profit Based Industry And Office
+
+This mod introduces different AI system for industrial and office buildings in the game.
+Key features:
+
+    Companies make expansion and contraction decisions based on their profit rather than product storage amount.
     Considers material costs.
-    Includes safeguards for very small companies.
     Set minimum company headcount to 1/4 of building capacity
-    Added system to sell company product to outside city (graph still dont update as of now)
+    Added system to sell company product to internal demand and outside city(graph still don't update as of now)
+    More organic growth of company
 
 Logic
-
 The original in game calculation is as follow
 
     less than 1/4 amount of storage fill with product, increase headcount
@@ -18,17 +22,10 @@ Issue
 
     Office do not sell any of the product
 
-This mod modify the calculation logic
-
-The profit-to-worth ratio (PTW) is equal to
-
-    for industry (cash reserves - material cost)/company total worth
-    for office cash reserves/company total worth
-
 The mod logic
 
-    if the PTW is larger than the Threshold it will increase headcount and vise versa
-    if the company total worth is smaller than the small company threshold headcount will stay at full
+    if the profit is larger than the Threshold it will increase headcount and vise versa
+    output will fulfilled internal demand with no mark up, export and import will have mark up on the price and mark down on the profit
     minimum company headcount to 1/4 of building capacity
 
 Effect of the mod
@@ -37,11 +34,22 @@ Effect of the mod
     traffic will increase
     non profiting company could see decrease headcount
     tax rate could impact company headcount more dramatically (by logic not verify)
-    company will now sell product to the global market. (cant do inter city transaction yet)
+    company will now sell product to the global market and intercity with intercity more profitable.
 
 Future plan
 
     investigate the threshold further to generate a balance
     create a option for user to define the threshold using percentile
-    small company and threshold would be better as a curve so set as a equation
+
+This mod may initial cause lag with huge population cities, but the lag will ease off after sometime as the updated calculation are done to most building.
+
+Thanks to @Mimonsi and @Infixo . your code in github help me a lot in understand how many of the function works.
+
+ads
+
+my suggestion on current issues
+
+https://forum.paradoxplaza.com/forum/threads/tax-calculation-improvement.1693123/
+
+https://forum.paradoxplaza.com/forum/threads/suggestion-for-improving-virtual-goods-handling-and-resource-system-optimization.1692705/
 
