@@ -37,7 +37,8 @@ namespace ProfitBasedIndustryAndOffice
         private NativeQueue<ResourceNeed> m_ResourceNeedQueue;
 
         private const int kUpdatesPerDay = 32;
-        private const int MINIMAL_EXPORT_AMOUNT = 200;
+        private const int MINIMAL_EXPORT_AMOUNT = 0;
+        private const int MINIMAL_STORAGE_AMOUNT = 10;
 
         private struct ResourceNeed
         {
@@ -54,7 +55,6 @@ namespace ProfitBasedIndustryAndOffice
             public int m_Amount;
         }
 
-        [BurstCompile]
         private struct CreateResourceMapJob : IJobChunk
         {
             [ReadOnly] public EntityTypeHandle EntityType;
@@ -113,7 +113,6 @@ namespace ProfitBasedIndustryAndOffice
             }
         }
 
-        [BurstCompile]
         private struct VirtualExportJob : IJobChunk
         {
             [ReadOnly] public EntityTypeHandle EntityType;
@@ -169,10 +168,17 @@ namespace ProfitBasedIndustryAndOffice
                         int totalAmount = resource.m_Amount;
                         int exportAmount = totalAmount;
 
-                        if ((resource.m_Resource == outputResource) || (hasNegativeMoney &&
-                            (resource.m_Resource == input1Resource ||
-                            (input2Resource != Resource.NoResource && resource.m_Resource == input2Resource))))
-                        {
+                        if (
+                            (resource.m_Resource == outputResource) || 
+                            (hasNegativeMoney &&
+                                ((resource.m_Resource == input1Resource && exportAmount > MINIMAL_STORAGE_AMOUNT) ||
+                                (input2Resource != Resource.NoResource && resource.m_Resource == input2Resource && exportAmount > MINIMAL_STORAGE_AMOUNT))
+                            )
+                        ){
+                            if (resource.m_Resource == input1Resource || resource.m_Resource == input2Resource) {
+                                exportAmount -= MINIMAL_STORAGE_AMOUNT;
+                            }
+
                             // Check resource needs
                             for (int k = 0; k < ResourceNeeds.Length && exportAmount > 0; k++)
                             {
@@ -240,11 +246,6 @@ namespace ProfitBasedIndustryAndOffice
                     {
                         if (ResourceNeeds[i].Amount > 0)
                         {
-                            // Create an import event for the remaining need
-                            float basePrice = EconomyUtils.GetMarketPrice(ResourceNeeds[i].Resource, ResourcePrefabs, ref ResourceDatas);
-                            float buyerMarkup = 1.25f; // 25% markup for imports
-                            int importPrice = UnityEngine.Mathf.RoundToInt(basePrice * ResourceNeeds[i].Amount * buyerMarkup);
-
                             ExportQueue.Enqueue(new VirtualExportEvent
                             {
                                 m_Seller = Entity.Null, // Null entity represents import from outside the city
@@ -252,9 +253,6 @@ namespace ProfitBasedIndustryAndOffice
                                 m_Amount = ResourceNeeds[i].Amount,
                                 m_Resource = ResourceNeeds[i].Resource
                             });
-
-                            // Log the import event
-                            SellCompanyProductSystem.log.Info($"Import event created: Resource {ResourceNeeds[i].Resource}, Amount {ResourceNeeds[i].Amount}, Import Price {importPrice}, Buyer {ResourceNeeds[i].Company.Index}");
                         }
                     }
                 }
@@ -279,19 +277,24 @@ namespace ProfitBasedIndustryAndOffice
                 while (ExportQueue.TryDequeue(out VirtualExportEvent item))
                 {
                     processedEvents++;
+
+                    // Get price x and price y
+                    float priceX = EconomyUtils.GetIndustrialPrice(item.m_Resource, ResourcePrefabs, ref ResourceDatas);
+                    float priceY = EconomyUtils.GetServicePrice(item.m_Resource, ResourcePrefabs, ref ResourceDatas);
+                    float marketPrice = priceX + priceY;
+
                     if (item.m_Seller == Entity.Null && Resources.HasBuffer(item.m_Buyer))
                     {
                         // Import event
                         importTransfers++;
                         var buyerBuffer = Resources[item.m_Buyer];
-                        float basePrice = EconomyUtils.GetMarketPrice(item.m_Resource, ResourcePrefabs, ref ResourceDatas);
-                        float buyerMarkup = 1.25f; // 25% markup for imports
-                        int importPrice = UnityEngine.Mathf.RoundToInt(basePrice * item.m_Amount * buyerMarkup);
+                        float buyerMarkup = 1.075f; // 10% markup for imports
+                        int importPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount * buyerMarkup);
 
                         EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
                         EconomyUtils.AddResources(Resource.Money, -importPrice, buyerBuffer);
 
-                        SellCompanyProductSystem.log.Info($"Import transfer: Resource {item.m_Resource}, Amount {item.m_Amount}, Import Price {importPrice}, Buyer {item.m_Buyer.Index}");
+                        SellCompanyProductSystem.log.Info($"External transfer (import): Resource {item.m_Resource}, Amount {item.m_Amount}, Import Price {importPrice}, Buyer {item.m_Buyer.Index}, Industrial Price {priceX}, Service Price {priceY}, Market Price {marketPrice}");
                     }
                     else if (Resources.HasBuffer(item.m_Seller) && Resources.HasBuffer(item.m_Buyer))
                     {
@@ -299,7 +302,7 @@ namespace ProfitBasedIndustryAndOffice
                         internalTransfers++;
                         var sellerBuffer = Resources[item.m_Seller];
                         var buyerBuffer = Resources[item.m_Buyer];
-                        int price = UnityEngine.Mathf.RoundToInt(EconomyUtils.GetMarketPrice(item.m_Resource, ResourcePrefabs, ref ResourceDatas) * item.m_Amount);
+                        int price = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount);
 
                         EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, sellerBuffer);
                         EconomyUtils.AddResources(Resource.Money, price, sellerBuffer);
@@ -307,25 +310,24 @@ namespace ProfitBasedIndustryAndOffice
                         EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
                         EconomyUtils.AddResources(Resource.Money, -price, buyerBuffer);
 
-                        SellCompanyProductSystem.log.Info($"Internal transfer: Resource {item.m_Resource}, Amount {item.m_Amount}, Price {price}, Seller {item.m_Seller.Index}, Buyer {item.m_Buyer.Index}");
+                        SellCompanyProductSystem.log.Info($"Internal transfer: Resource {item.m_Resource}, Amount {item.m_Amount}, Price {price}, Seller {item.m_Seller.Index}, Buyer {item.m_Buyer.Index}, Industrial Price {priceX}, Service Price {priceY}, Market Price {marketPrice}");
                     }
                     else if (Resources.HasBuffer(item.m_Seller))
                     {
                         // External transfer (export)
                         externalTransfers++;
                         var resourceBuffer = Resources[item.m_Seller];
-                        float basePrice = EconomyUtils.GetMarketPrice(item.m_Resource, ResourcePrefabs, ref ResourceDatas);
-                        float sellerMarkdown = 0.75f; // 25% markdown for seller
-                        int sellerPrice = UnityEngine.Mathf.RoundToInt(basePrice * item.m_Amount * sellerMarkdown);
+                        float sellerMarkdown = 0.925f; // 10% markdown for seller
+                        int sellerPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount * sellerMarkdown);
 
                         EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, resourceBuffer);
                         EconomyUtils.AddResources(Resource.Money, sellerPrice, resourceBuffer);
 
-                        SellCompanyProductSystem.log.Info($"External transfer (export): Resource {item.m_Resource}, Amount {item.m_Amount}, Base Price {basePrice}, Seller Price {sellerPrice}, Seller {item.m_Seller.Index}");
+                        SellCompanyProductSystem.log.Info($"External transfer (export): Resource {item.m_Resource}, Amount {item.m_Amount}, Base Price {marketPrice}, Seller Price {sellerPrice}, Seller {item.m_Seller.Index}, Industrial Price {priceX}, Service Price {priceY}, Market Price {marketPrice}");
                     }
                     else
                     {
-                        SellCompanyProductSystem.log.Info($"Invalid transfer: Seller {item.m_Seller.Index} does not have a resource buffer");
+                        SellCompanyProductSystem.log.Info($"Invalid transfer: Seller {item.m_Seller.Index} does not have a resource buffer. Resource {item.m_Resource}, Industrial Price {priceX}, Service Price {priceY}, Market Price {marketPrice}");
                     }
                 }
 
