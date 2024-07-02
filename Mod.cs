@@ -5,6 +5,7 @@ using Game.Modding;
 using Game.SceneFlow;
 using Unity.Entities;
 using System;
+using ProfitBasedIndustryAndOffice.Prefabs;
 
 namespace ProfitBasedIndustryAndOffice.ModSystem
 {
@@ -32,6 +33,7 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
             m_SimulationWorld = World.DefaultGameObjectInjectionWorld;
 
             // Register systems
+            CompanyFinancialsManager.Initialize(1000000);
             RegisterModifiedSystem(updateSystem);
             RegisterSellCompanyProductSystem(updateSystem);
         }
@@ -84,6 +86,9 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                 m_SellCompanyProductSystemHandle = default;
                 log.Info("SellCompanyProductSystem removed from simulation world");
             }
+
+            CompanyFinancialsManager.Dispose();
+            log.Info("CompanyFinancialsManager disposed");
 
             // Cleanup for ModifiedIndustrialAISystem is not needed here as the game will handle system disposal
         }

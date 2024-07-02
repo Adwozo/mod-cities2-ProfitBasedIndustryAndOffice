@@ -38,8 +38,8 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
         private NativeQueue<ResourceNeed> m_ResourceNeedQueue;
 
         private const int kUpdatesPerDay = 32;
-        private const int MINIMAL_EXPORT_AMOUNT = 0;
-        private const int MINIMAL_STORAGE_AMOUNT = 10;
+        private const int MINIMAL_EXPORT_AMOUNT = 20;
+        private const int MINIMAL_STORAGE_AMOUNT = 20;
 
         private struct ResourceNeed
         {
@@ -129,6 +129,7 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
+                var companyFinancialsMap = CompanyFinancialsManager.GetCompanyFinancialsMap();
                 var entities = chunk.GetNativeArray(EntityType);
                 var resourceBuffers = chunk.GetBufferAccessor(ref ResourcesType);
                 var prefabRefs = chunk.GetNativeArray(ref PrefabRefType);
@@ -173,6 +174,31 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                         int totalAmount = resource.m_Amount;
                         int exportAmount = totalAmount;
 
+                        if (exportAmount < MINIMAL_EXPORT_AMOUNT) continue;
+
+                        if (resource.m_Resource == outputResource) {
+                            // create update CompanyFinancials
+                            if (companyFinancialsMap.TryGetValue(entity, out CompanyFinancials financials))
+                            {
+                                int oldCashHolding = financials.CurrentCashHolding;
+                                financials.LastExportEventCashHolding = oldCashHolding;
+                                financials.CurrentCashHolding = currentCashHolding;
+                                companyFinancialsMap[entity] = financials;
+
+                                //log.Info($"Updated financials for Entity {entity.Index}: Old Cash: {financials.LastExportEventCashHolding}, New Cash: {financials.CurrentCashHolding}");
+                            }
+                            else
+                            {
+                                companyFinancialsMap[entity] = new CompanyFinancials
+                                {
+                                    CurrentCashHolding = currentCashHolding,
+                                    LastExportEventCashHolding = currentCashHolding
+                                };
+
+                                //log.Info($"Created new financials for Entity {entity.Index}: Initial Cash: {financials.CurrentCashHolding}");
+                            }
+                        }
+                        
                         if (
                             (resource.m_Resource == outputResource) || 
                             (hasNegativeMoney &&
@@ -275,8 +301,6 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
 
             public void Execute()
             {
-                var companyFinancialsMap = CompanyFinancialsManager.GetCompanyFinancialsMap();
-
                 int processedEvents = 0;
                 int internalTransfers = 0;
                 int externalTransfers = 0;
@@ -296,7 +320,7 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                         // Import event
                         importTransfers++;
                         var buyerBuffer = Resources[item.m_Buyer];
-                        int importPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount);
+                        int importPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount * 0.95f);
 
                         EconomyUtils.AddResources(item.m_Resource, item.m_Amount, buyerBuffer);
                         EconomyUtils.AddResources(Resource.Money, -importPrice, buyerBuffer);
@@ -321,24 +345,10 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                         // External transfer (export)
                         externalTransfers++;
                         var resourceBuffer = Resources[item.m_Seller];
-                        int sellerPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount);
+                        int exportPrice = UnityEngine.Mathf.RoundToInt(marketPrice * item.m_Amount * 1.05f);
 
                         EconomyUtils.AddResources(item.m_Resource, -item.m_Amount, resourceBuffer);
-                        EconomyUtils.AddResources(Resource.Money, sellerPrice, resourceBuffer);
-                    }
-
-                    if (companyFinancialsMap.TryGetValue(item.m_Seller, out CompanyFinancials financials))
-                    {
-                        financials.CurrentCashHolding = item.m_CurrentCashHolding;
-                        companyFinancialsMap[item.m_Seller] = financials;
-                    }
-                    else
-                    {
-                        companyFinancialsMap[item.m_Seller] = new CompanyFinancials
-                        {
-                            CurrentCashHolding = item.m_CurrentCashHolding,
-                            LastExportEventCashHolding = item.m_CurrentCashHolding
-                        };
+                        EconomyUtils.AddResources(Resource.Money, exportPrice, resourceBuffer);
                     }
                 }
             }
@@ -360,11 +370,10 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                 ComponentType.ReadOnly<Game.Companies.ProcessingCompany>(),
                 ComponentType.ReadWrite<WorkProvider>(),
                 ComponentType.ReadOnly<UpdateFrame>(),
-                ComponentType.ReadOnly<Resources>(),
                 ComponentType.Exclude<ServiceAvailable>(),
                 ComponentType.Exclude<Deleted>(),
                 ComponentType.Exclude<Temp>()
-            );
+                );
 
             m_EconomyParameterQuery = GetEntityQuery(ComponentType.ReadOnly<EconomyParameterData>());
 

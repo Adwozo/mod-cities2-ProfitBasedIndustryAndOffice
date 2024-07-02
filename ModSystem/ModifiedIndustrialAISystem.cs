@@ -13,6 +13,7 @@ using Unity.Burst.Intrinsics;
 using Colossal.Logging;
 using Unity.Mathematics;
 using System;
+using ProfitBasedIndustryAndOffice.Prefabs;
 
 namespace ProfitBasedIndustryAndOffice.ModSystem
 {
@@ -29,6 +30,7 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
 
         private const float EXPANSION_THRESHOLD = 0.7f;
         private const float CONTRACTION_THRESHOLD = 0.4f;
+        private const int HEADCOUNT_TICK_CHANGE = 2;
         private const int kUpdatesPerDay = 32;
 
         private struct CompanyAITickJob : IJobChunk
@@ -68,11 +70,14 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                 BufferAccessor<OwnedVehicle> vehicles = chunk.GetBufferAccessor(ref VehicleType);
                 BufferAccessor<TradeCost> tradeCosts = chunk.GetBufferAccessor(ref TradeCostType);
                 BufferAccessor<Employee> employees = chunk.GetBufferAccessor(ref EmployeeType);
+                var companyFinancialsMap = CompanyFinancialsManager.GetCompanyFinancialsMap();
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     Entity entity = entities[i];
                     WorkProvider workProvider = workProviders[i];
+
+                    CompanyFinancialsManager.TryGetCompanyFinancials(entity, out CompanyFinancials companyFinancials);
 
                     if (!PropertyRenters.HasComponent(entity)) continue;
 
@@ -108,20 +113,79 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                                         $"Expansion Threshold: {EXPANSION_THRESHOLD:F2} | Contraction Threshold: {CONTRACTION_THRESHOLD:F2}";
 
                     log.Info(logMessage);**/
-                    if (companyFreeCash > 0 && workProvider.m_MaxWorkers < fittingWorkers)
+                    bool shouldIncrease = false;
+                    bool shouldDecrease = false;
+
+                    if (CompanyFinancialsManager.TryGetCompanyFinancials(entity, out CompanyFinancials financials))
                     {
-                        workProvider.m_MaxWorkers = math.min(workProvider.m_MaxWorkers + 1, fittingWorkers);
+                        // Use CompanyFinancials data
+                        int profit = financials.CurrentCashHolding - financials.LastExportEventCashHolding;
+                        if (financials.HeadCount == 0) {
+                            financials.HeadCount = workProvider.m_MaxWorkers;
+                        }
+                        workProvider.m_MaxWorkers = financials.HeadCount;
+
+                        //log.Info($"Entity {entity.Index}: Current Cash: {financials.CurrentCashHolding}, Last Cash: {financials.LastExportEventCashHolding}, Profit: {profit}");
+
+                        if (profit > 0)
+                        {
+                            shouldIncrease = true;
+                            //log.Info($"Entity {entity.Index}: Profit positive, considering increase");
+                            // Update HeadCount with the current MaxWorkers
+                            financials.HeadCount = workProvider.m_MaxWorkers + HEADCOUNT_TICK_CHANGE;
+                            companyFinancialsMap[entity] = financials;
+                            //log.Info($"Entity {entity.Index}: Updated HeadCount to {financials.HeadCount}");
+                        }
+                        else if (profit < 0 && Math.Abs(profit) > financials.CurrentCashHolding * 0.1f)
+                        {
+                            shouldDecrease = true;
+                            //log.Info($"Entity {entity.Index}: Significant loss, considering decrease");
+                            // Update HeadCount with the current MaxWorkers
+                            financials.HeadCount = workProvider.m_MaxWorkers - HEADCOUNT_TICK_CHANGE;
+                            companyFinancialsMap[entity] = financials;
+                            //log.Info($"Entity {entity.Index}: Updated HeadCount to {financials.HeadCount}");
+                        }
+                        
                     }
-                    else if (companyFreeCash < 0 && workProvider.m_MaxWorkers > fittingWorkers / 4)
+                    else
                     {
-                        workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - 2, fittingWorkers / 4);
+                        //log.Info($"Entity {entity.Index}: No financial data found, using free cash. Free Cash: {companyFreeCash}");
+                        // Fallback to checking free cash
+                        if (companyFreeCash > 0)
+                        {
+                            shouldIncrease = true;
+                            //log.Info($"Entity {entity.Index}: Free cash positive, considering increase");
+                        }
+                        else if (companyFreeCash < 0)
+                        {
+                            shouldDecrease = true;
+                            //log.Info($"Entity {entity.Index}: Free cash negative, considering decrease");
+                        }
                     }
+
+                    if (shouldIncrease && workProvider.m_MaxWorkers < fittingWorkers)
+                    {
+                        int oldWorkers = workProvider.m_MaxWorkers;
+                        workProvider.m_MaxWorkers = math.min(workProvider.m_MaxWorkers + HEADCOUNT_TICK_CHANGE, fittingWorkers);
+                        //log.Info($"Entity {entity.Index}: Increased workers from {oldWorkers} to {workProvider.m_MaxWorkers}");
+                    }
+                    else if (shouldDecrease && workProvider.m_MaxWorkers > fittingWorkers / 4)
+                    {
+                        int oldWorkers = workProvider.m_MaxWorkers;
+                        workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - HEADCOUNT_TICK_CHANGE, fittingWorkers / 4);
+                        //log.Info($"Entity {entity.Index}: Decreased workers from {oldWorkers} to {workProvider.m_MaxWorkers}");
+                    }
+
+                    // Ensure we always have at least 1/4 of fitting workers
                     if (workProvider.m_MaxWorkers < fittingWorkers / 4)
                     {
+                        int oldWorkers = workProvider.m_MaxWorkers;
                         workProvider.m_MaxWorkers = fittingWorkers / 4;
+                        //log.Info($"Entity {entity.Index}: Adjusted workers to minimum from {oldWorkers} to {workProvider.m_MaxWorkers}");
                     }
 
                     workProviders[i] = workProvider;
+                    //log.Info($"Entity {entity.Index}: Final worker count: {workProvider.m_MaxWorkers}, Fitting workers: {fittingWorkers}");
                 }
             }
         }
