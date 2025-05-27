@@ -1,55 +1,49 @@
-https://mods.paradoxplaza.com/mods/83825/Windows
+# Profit Based Industry And Office
 
-Profit Based Industry And Office
+[Download on Paradox Mods](https://mods.paradoxplaza.com/mods/83825/Windows)
 
-This mod introduces different AI system for industrial and office buildings in the game.
-Key features:
+## Introduction
+This mod introduces a different AI system for industrial and office buildings in Cities: Skylines II. Instead of basing expansion decisions on product storage, companies now make decisions based on profitability.
 
-    Companies make expansion and contraction decisions based on their profit rather than product storage amount.
-    Considers material costs.
-    Set minimum company headcount to 1/4 of building capacity
-    Added system to sell company product to internal demand and outside city(graph still don't update as of now)
-    More organic growth of company
+## Key Features
+- Companies make expansion and contraction decisions based on their profit rather than product storage amount
+- Considers material costs when determining profitability
+- Sets minimum company headcount to 1/4 of building capacity
+- Added system to sell company products to internal demand and outside cities (graph visuals not yet updated)
+- Creates more organic growth of companies
 
-Logic
-The original in game calculation is as follow
+## How It Works
 
-    less than 1/4 amount of storage fill with product, increase headcount
-    more than 1/2 amount of storage fill will product, decrease headcount
-    minimum company headcount is 5
+### Original In-Game Logic
+- Less than 1/4 amount of storage filled with product: increase headcount
+- More than 1/2 amount of storage filled with product: decrease headcount
+- Minimum company headcount is 5
+- Major issue: Office buildings don't sell any of their products
 
-Issue
+### Modified Logic
+- If profit exceeds a threshold: increase headcount
+- If profit falls below threshold: decrease headcount
+- Output fulfills internal demand with no markup
+- Export and import have price markup and profit markdown
+- Minimum company headcount set to 1/4 of building capacity
 
-    Office do not sell any of the product
+## Effects of the Mod
+- Company headcount will settle at slightly lower levels than pre-economy update
+- Traffic will increase due to more product movement
+- Non-profitable companies will see decreased headcount
+- Tax rates have more dramatic impact on company headcount
+- Companies now sell products to both the global market and between cities (with inter-city trade being more profitable)
 
-The mod logic
+## Performance Note
+This mod may initially cause lag in cities with large populations, but the lag will ease off after the updated calculations are applied to most buildings.
 
-    if the profit is larger than the Threshold it will increase headcount and vise versa
-    output will fulfilled internal demand with no mark up, export and import will have mark up on the price and mark down on the profit
-    minimum company headcount to 1/4 of building capacity
+## Future Plans
+- Further investigate the profit threshold to improve balance
+- Create options for users to define thresholds using percentiles
 
-Effect of the mod
+## Acknowledgements
+Thanks to @Mimonsi and @Infixo. Your code in GitHub helped me understand how many of the game functions work.
 
-    you will see company headcount go to a slightly lower level than pre economy update
-    traffic will increase
-    non profiting company could see decrease headcount
-    tax rate could impact company headcount more dramatically (by logic not verify)
-    company will now sell product to the global market and intercity with intercity more profitable.
-
-Future plan
-
-    investigate the threshold further to generate a balance
-    create a option for user to define the threshold using percentile
-
-This mod may initial cause lag with huge population cities, but the lag will ease off after sometime as the updated calculation are done to most building.
-
-Thanks to @Mimonsi and @Infixo . your code in github help me a lot in understand how many of the function works.
-
-ads
-
-my suggestion on current issues
-
-https://forum.paradoxplaza.com/forum/threads/tax-calculation-improvement.1693123/
-
-https://forum.paradoxplaza.com/forum/threads/suggestion-for-improving-virtual-goods-handling-and-resource-system-optimization.1692705/
-
+## Related Discussions
+- [Tax Calculation Improvement](https://forum.paradoxplaza.com/forum/threads/tax-calculation-improvement.1693123/)
+- [Improving Virtual Goods Handling and Resource System Optimization](https://forum.paradoxplaza.com/forum/threads/suggestion-for-improving-virtual-goods-handling-and-resource-system-optimization.1692705/)
