@@ -13,6 +13,10 @@
 	<Import Project="$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))\Mod.props" />
 	<Import Project="$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))\Mod.targets" />
 
+	<PropertyGroup>
+		<TargetFramework Condition="'$(TargetFramework)' != 'net472'">net472</TargetFramework>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<Reference Include="Game">
 			<Private>false</Private>
