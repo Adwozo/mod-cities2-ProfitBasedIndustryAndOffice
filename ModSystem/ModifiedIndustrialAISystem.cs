@@ -8,7 +8,6 @@ using Game.Prefabs;
 using Game.Vehicles;
 using UnityEngine;
 using Unity.Collections;
-using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Colossal.Logging;
 using Unity.Mathematics;
@@ -28,8 +27,6 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
 
         public static ILog log = LogManager.GetLogger($"{nameof(ProfitBasedIndustryAndOffice)}.Combined.{nameof(ModifiedIndustrialAISystem)}").SetShowsErrorsInUI(false);
 
-        private const float EXPANSION_THRESHOLD = 0.7f;
-        private const float CONTRACTION_THRESHOLD = 0.4f;
         private const int HEADCOUNT_TICK_CHANGE = 2;
         private const int kUpdatesPerDay = 32;
 
@@ -55,7 +52,7 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
 
             public ResourcePrefabs ResourcePrefabs;
             public uint UpdateFrameIndex;
-            public EntityCommandBuffer.ParallelWriter CommandBuffer;
+            public NativeParallelHashMap<Entity, CompanyFinancials> CompanyFinancialsMap;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -70,14 +67,11 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                 BufferAccessor<OwnedVehicle> vehicles = chunk.GetBufferAccessor(ref VehicleType);
                 BufferAccessor<TradeCost> tradeCosts = chunk.GetBufferAccessor(ref TradeCostType);
                 BufferAccessor<Employee> employees = chunk.GetBufferAccessor(ref EmployeeType);
-                var companyFinancialsMap = CompanyFinancialsManager.GetCompanyFinancialsMap();
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     Entity entity = entities[i];
                     WorkProvider workProvider = workProviders[i];
-
-                    CompanyFinancialsManager.TryGetCompanyFinancials(entity, out CompanyFinancials companyFinancials);
 
                     if (!PropertyRenters.HasComponent(entity)) continue;
 
@@ -113,79 +107,91 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                                         $"Expansion Threshold: {EXPANSION_THRESHOLD:F2} | Contraction Threshold: {CONTRACTION_THRESHOLD:F2}";
 
                     log.Info(logMessage);**/
+                    int minimumWorkers = math.max(fittingWorkers / 4, 1);
+
+                    CompanyFinancials financials = default;
+                    bool hasEntry = false;
+                    if (CompanyFinancialsMap.IsCreated)
+                    {
+                        hasEntry = CompanyFinancialsMap.TryGetValue(entity, out financials);
+                    }
+
+                    bool shouldAddEntry = !hasEntry;
+
+                    if (!hasEntry || !financials.Initialized)
+                    {
+                        financials = new CompanyFinancials
+                        {
+                            LastCashBalance = companyMoney,
+                            HeadCount = math.max(workProvider.m_MaxWorkers, minimumWorkers),
+                            Initialized = true
+                        };
+                    }
+                    else if (financials.HeadCount == 0)
+                    {
+                        financials.HeadCount = math.max(workProvider.m_MaxWorkers, minimumWorkers);
+                    }
+
+                    workProvider.m_MaxWorkers = math.max(financials.HeadCount, minimumWorkers);
+
+                    int profit = companyMoney - financials.LastCashBalance;
                     bool shouldIncrease = false;
                     bool shouldDecrease = false;
 
-                    if (CompanyFinancialsManager.TryGetCompanyFinancials(entity, out CompanyFinancials financials))
+                    if (profit > 0)
                     {
-                        // Use CompanyFinancials data
-                        int profit = financials.CurrentCashHolding - financials.LastExportEventCashHolding;
-                        if (financials.HeadCount == 0) {
-                            financials.HeadCount = workProvider.m_MaxWorkers;
-                        }
-                        workProvider.m_MaxWorkers = financials.HeadCount;
-
-                        //log.Info($"Entity {entity.Index}: Current Cash: {financials.CurrentCashHolding}, Last Cash: {financials.LastExportEventCashHolding}, Profit: {profit}");
-
-                        if (profit > 0)
-                        {
-                            shouldIncrease = true;
-                            //log.Info($"Entity {entity.Index}: Profit positive, considering increase");
-                            // Update HeadCount with the current MaxWorkers
-                            financials.HeadCount = workProvider.m_MaxWorkers + HEADCOUNT_TICK_CHANGE;
-                            companyFinancialsMap[entity] = financials;
-                            //log.Info($"Entity {entity.Index}: Updated HeadCount to {financials.HeadCount}");
-                        }
-                        else if (profit < 0 && Math.Abs(profit) > financials.CurrentCashHolding * 0.1f)
+                        shouldIncrease = true;
+                    }
+                    else if (profit < 0)
+                    {
+                        float lossThreshold = math.max(math.abs(financials.LastCashBalance), 1) * 0.1f;
+                        if (math.abs(profit) > lossThreshold)
                         {
                             shouldDecrease = true;
-                            //log.Info($"Entity {entity.Index}: Significant loss, considering decrease");
-                            // Update HeadCount with the current MaxWorkers
-                            financials.HeadCount = workProvider.m_MaxWorkers - HEADCOUNT_TICK_CHANGE;
-                            companyFinancialsMap[entity] = financials;
-                            //log.Info($"Entity {entity.Index}: Updated HeadCount to {financials.HeadCount}");
                         }
-                        
                     }
                     else
                     {
-                        //log.Info($"Entity {entity.Index}: No financial data found, using free cash. Free Cash: {companyFreeCash}");
-                        // Fallback to checking free cash
                         if (companyFreeCash > 0)
                         {
                             shouldIncrease = true;
-                            //log.Info($"Entity {entity.Index}: Free cash positive, considering increase");
                         }
                         else if (companyFreeCash < 0)
                         {
                             shouldDecrease = true;
-                            //log.Info($"Entity {entity.Index}: Free cash negative, considering decrease");
                         }
                     }
 
                     if (shouldIncrease && workProvider.m_MaxWorkers < fittingWorkers)
                     {
-                        int oldWorkers = workProvider.m_MaxWorkers;
                         workProvider.m_MaxWorkers = math.min(workProvider.m_MaxWorkers + HEADCOUNT_TICK_CHANGE, fittingWorkers);
-                        //log.Info($"Entity {entity.Index}: Increased workers from {oldWorkers} to {workProvider.m_MaxWorkers}");
                     }
-                    else if (shouldDecrease && workProvider.m_MaxWorkers > fittingWorkers / 4)
+                    else if (shouldDecrease && workProvider.m_MaxWorkers > minimumWorkers)
                     {
-                        int oldWorkers = workProvider.m_MaxWorkers;
-                        workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - HEADCOUNT_TICK_CHANGE, fittingWorkers / 4);
-                        //log.Info($"Entity {entity.Index}: Decreased workers from {oldWorkers} to {workProvider.m_MaxWorkers}");
+                        workProvider.m_MaxWorkers = math.max(workProvider.m_MaxWorkers - HEADCOUNT_TICK_CHANGE, minimumWorkers);
                     }
 
-                    // Ensure we always have at least 1/4 of fitting workers
-                    if (workProvider.m_MaxWorkers < fittingWorkers / 4)
+                    if (workProvider.m_MaxWorkers < minimumWorkers)
                     {
-                        int oldWorkers = workProvider.m_MaxWorkers;
-                        workProvider.m_MaxWorkers = fittingWorkers / 4;
-                        //log.Info($"Entity {entity.Index}: Adjusted workers to minimum from {oldWorkers} to {workProvider.m_MaxWorkers}");
+                        workProvider.m_MaxWorkers = minimumWorkers;
+                    }
+
+                    financials.HeadCount = workProvider.m_MaxWorkers;
+                    financials.LastCashBalance = companyMoney;
+
+                    if (CompanyFinancialsMap.IsCreated)
+                    {
+                        if (shouldAddEntry)
+                        {
+                            CompanyFinancialsMap.TryAdd(entity, financials);
+                        }
+                        else
+                        {
+                            CompanyFinancialsMap[entity] = financials;
+                        }
                     }
 
                     workProviders[i] = workProvider;
-                    //log.Info($"Entity {entity.Index}: Final worker count: {workProvider.m_MaxWorkers}, Fitting workers: {fittingWorkers}");
                 }
             }
         }
@@ -236,10 +242,10 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                     UpdateFrameType = GetSharedComponentTypeHandle<UpdateFrame>(),
                     ResourcePrefabs = m_ResourceSystem.GetPrefabs(),
                     UpdateFrameIndex = updateFrame,
-                    CommandBuffer = m_EndFrameBarrier.CreateCommandBuffer().AsParallelWriter()
+                    CompanyFinancialsMap = CompanyFinancialsManager.GetCompanyFinancialsMap()
                 };
 
-                Dependency = job.ScheduleParallel(m_CompanyQuery, Dependency);
+                Dependency = job.Schedule(m_CompanyQuery, Dependency);
 
                 log.Info("Adding job handles to EndFrameBarrier");
                 m_EndFrameBarrier.AddJobHandleForProducer(Dependency);
