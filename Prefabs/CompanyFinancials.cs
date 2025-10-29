@@ -1,27 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Unity.Collections;
+﻿using Unity.Collections;
 using Unity.Entities;
 
 namespace ProfitBasedIndustryAndOffice.Prefabs
 {
     public struct CompanyFinancials
     {
-        public int CurrentCashHolding;
-        public int LastExportEventCashHolding;
+        public int LastCashBalance;
         public int HeadCount;
+        public bool Initialized;
     }
 
-    internal class CompanyFinancialsManager
+    internal static class CompanyFinancialsManager
     {
-        private static NativeHashMap<Entity, CompanyFinancials> s_CompanyFinancialsMap;
+        private static NativeParallelHashMap<Entity, CompanyFinancials> s_CompanyFinancialsMap;
 
         public static void Initialize(int capacity)
         {
-            s_CompanyFinancialsMap = new NativeHashMap<Entity, CompanyFinancials>(capacity, Allocator.Persistent);
+            if (s_CompanyFinancialsMap.IsCreated)
+            {
+                s_CompanyFinancialsMap.Dispose();
+            }
+
+            s_CompanyFinancialsMap = new NativeParallelHashMap<Entity, CompanyFinancials>(capacity, Allocator.Persistent);
         }
 
         public static void Dispose()
@@ -32,13 +32,19 @@ namespace ProfitBasedIndustryAndOffice.Prefabs
             }
         }
 
-        public static NativeHashMap<Entity, CompanyFinancials> GetCompanyFinancialsMap()
+        public static NativeParallelHashMap<Entity, CompanyFinancials> GetCompanyFinancialsMap()
         {
             return s_CompanyFinancialsMap;
         }
 
         public static bool TryGetCompanyFinancials(Entity company, out CompanyFinancials financials)
         {
+            if (!s_CompanyFinancialsMap.IsCreated)
+            {
+                financials = default;
+                return false;
+            }
+
             return s_CompanyFinancialsMap.TryGetValue(company, out financials);
         }
     }

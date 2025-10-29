@@ -8,7 +8,7 @@ Key features:
     Companies make expansion and contraction decisions based on their profit rather than product storage amount.
     Considers material costs.
     Set minimum company headcount to 1/4 of building capacity
-    Added system to sell company product to internal demand and outside city(graph still don't update as of now)
+    Streamlined to focus purely on profit-based workforce scaling after the vanilla cargo handling fix
     More organic growth of company
 
 Logic
@@ -20,12 +20,11 @@ The original in game calculation is as follow
 
 Issue
 
-    Office do not sell any of the product
+    Vanilla handled office product sales, but headcount still failed to follow profitability trends
 
 The mod logic
 
     if the profit is larger than the Threshold it will increase headcount and vise versa
-    output will fulfilled internal demand with no mark up, export and import will have mark up on the price and mark down on the profit
     minimum company headcount to 1/4 of building capacity
 
 Effect of the mod
@@ -34,7 +33,7 @@ Effect of the mod
     traffic will increase
     non profiting company could see decrease headcount
     tax rate could impact company headcount more dramatically (by logic not verify)
-    company will now sell product to the global market and intercity with intercity more profitable.
+    smoother stabilization once companies align headcount to profitability
 
 Future plan
 
