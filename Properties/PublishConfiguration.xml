@@ -8,58 +8,46 @@
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<!--LongDescription Value="" /-->
 	<LongDescription>
-    ## Profit Based Industry And Office
+updated for 1.3.6f1
+**For expanded feature please check out**
 
-    ## For similar but expended feature please check out
+**Market Based Economy**
+**https://mods.paradoxplaza.com/mods/122923/Windows**
 
-    ## Market Based Economy
+### Profit Based Industry And Office
 
-    ## https://mods.paradoxplaza.com/mods/122923/Windows
+This mod introduces different AI system for industrial and office buildings in the game.
 
-    This mod introduces different AI system for industrial and office buildings in the game.
+**Key features:**
 
-    ## Key features:
+- Companies make expansion and contraction decisions based on their profit rather than product storage amount.
+- Considers material costs.
+- Set minimum company headcount to 1/4 of building capacity
+- More organic growth of company
 
-    - Companies make expansion and contraction decisions based on their profit rather than product storage amount.
-    - Considers material costs.
-    - Set minimum company headcount to 1/4 of building capacity
-    - More organic growth of company
+**Logic**
 
-    ## Logic
+The original in game calculation is as follow
+- less than 1/4 amount of storage fill with product, increase headcount
+- more than 1/2 amount of storage fill will product, decrease headcount
+- minimum company headcount is 5
 
-    ### The original in game calculation is as follow
+**The mod logic**
 
-    - less than 1/4 amount of storage fill with product, increase headcount
-    - more than 1/2 amount of storage fill will product, decrease headcount
-    - minimum company headcount is 5
+- if the profit is larger than the Threshold it will increase headcount and vise versa
+- output will fullfield internal demand with no mark up, export and import will have mark up on the price and mark down on the profit
+- minimum company headcount to 1/4 of building capacity
 
-    ### Issue
+**Effect of the mod**
 
-    - Office do not sell any of the product
+- industrial and office buildings will have more organic growth and contraction
+- non profiting company could see decrease headcount
+- tax rate could impact company headcount more dramatically (by logic not verify)
 
-    ### The mod logic
+This mod may initial cause lag with huge population cities, but the lag will ease off after sometime as the updated calculation are done to most building.
 
-    - if the profit is larger than the Threshold it will increase headcount and vise versa
-    - output will fullfield internal demand with no mark up, export and import will have mark up on the price and mark down on the profit
-    - minimum company headcount to 1/4 of building capacity
-
-    ## Effect of the mod
-
-    - you will see company headcount go to a slightly lower level than pre economy update
-    - traffic will increase
-    - non profiting company could see decrease headcount
-    - tax rate could impact company headcount more dramatically (by logic not verify)
-    - company will now sell product to the global market. (cant do inter city transaction yet)
-
-    ## Future plan
-
-    - investigate the threshold further to generate a balance
-    - create a option for user to define the threshold using percentile
-
-    This mod may initial cause lag with huge population cities, but the lag will ease off after sometime as the updated calculation are done to most building.
-
-    Thanks to @Mimonsi and @Infixo . your code in github help me alot in understand how many of the function works.
-    And thanks to @Cimplicity for working on the problem together via Office Sales Go!
+Thanks to @Mimonsi and @Infixo . your code in github help me alot in understand how many of the function works.
+And thanks to @Cimplicity for working on the problem together via Office Sales Go!
 
   </LongDescription>
 	<!--Thumbnail-->
@@ -77,13 +65,13 @@
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/profit-based-industry-and-office.1692457/" />
 	<!--Version of the mod-->
-	<ModVersion Value="1.4.2" />
+	<ModVersion Value="1.4.3" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.3.*" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="add Setting to use only sale system mode and disbale ai system for headcount change" />
+	<ChangeLog Value="1.3.6f1 game update" />
 	<!--ChangeLog>
 	</ChangeLog-->
 	<!--External link. supported types are discord, github, youtube, twitch, x, paypal, patreon, buymeacoffee, kofi, crowdin, gitlab-->
