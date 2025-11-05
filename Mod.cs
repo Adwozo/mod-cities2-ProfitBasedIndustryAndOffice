@@ -1,24 +1,33 @@
-﻿using Colossal.Logging;
+﻿using Colossal.IO.AssetDatabase;
+using Colossal.Logging;
 using Game;
 using Game.Modding;
 using Game.SceneFlow;
 using System;
 using ProfitBasedIndustryAndOffice.Prefabs;
+using UnityEngine;
 
 namespace ProfitBasedIndustryAndOffice.ModSystem
 {
     public class Mod : IMod
     {
         public static ILog log = LogManager.GetLogger($"{nameof(ProfitBasedIndustryAndOffice)}.{nameof(Mod)}").SetShowsErrorsInUI(false);
+    private Setting m_Setting;
 
         public void OnLoad(UpdateSystem updateSystem)
         {
-            log.Info(nameof(OnLoad));
+            ModLog.Info(log, nameof(OnLoad));
 
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset))
             {
-                log.Info($"Current mod asset at {asset.path}");
+                ModLog.Info(log, $"Current mod asset at {asset.path}");
             }
+
+            m_Setting = new Setting(this);
+            AssetDatabase.global.LoadSettings(nameof(ProfitBasedIndustryAndOffice), m_Setting, new Setting(this));
+            m_Setting.RegisterInOptionsUI();
+            GameManager.instance.localizationManager.AddSource("en-US", new LocaleEN(m_Setting));
+            ModLog.VerboseEnabled = m_Setting.EnableVerboseLogging;
 
             CompanyFinancialsManager.Initialize(1000000);
             RegisterModifiedSystem(updateSystem);
@@ -29,20 +38,29 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
             try
             {
                 updateSystem.UpdateAt<ModifiedIndustrialAISystem>(SystemUpdatePhase.GameSimulation);
-                log.Info("ModifiedIndustrialAISystem registered successfully.");
+                ModLog.Info(log, "ModifiedIndustrialAISystem registered successfully.");
             }
             catch (Exception e)
             {
-                log.Error($"Failed to register ModifiedIndustrialAISystem: {e.Message}");
+                ModLog.Error(log, $"Failed to register ModifiedIndustrialAISystem: {e.Message}");
+                Debug.LogException(e);
             }
         }
 
         public void OnDispose()
         {
-            log.Info(nameof(OnDispose));
+            ModLog.Info(log, nameof(OnDispose));
 
             CompanyFinancialsManager.Dispose();
-            log.Info("CompanyFinancialsManager disposed");
+            ModLog.Info(log, "CompanyFinancialsManager disposed");
+
+            if (m_Setting != null)
+            {
+                m_Setting.UnregisterInOptionsUI();
+                m_Setting = null;
+            }
+
+            ModLog.VerboseEnabled = false;
         }
     }
 }

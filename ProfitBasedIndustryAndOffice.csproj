@@ -76,4 +76,8 @@
 		<None Include="$(ModTargetsFile)" Link="Properties\Mod.targets" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<Compile Remove="ref\**" />
+	</ItemGroup>
+
 </Project>

@@ -13,6 +13,7 @@ using Colossal.Logging;
 using Unity.Mathematics;
 using System;
 using ProfitBasedIndustryAndOffice.Prefabs;
+using ProfitBasedIndustryAndOffice;
 
 namespace ProfitBasedIndustryAndOffice.ModSystem
 {
@@ -100,13 +101,7 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                         processData
                     );
 
-                    /**string logMessage = $"Company: {entity.Index} | Max Workers: {workProvider.m_MaxWorkers} | " +
-                                        $"Fitting Workers: {fittingWorkers} | Company Money: {companyMoney} | " +
-                                        $"Material Cost: {materialCost:F2} | Profit: {profit:F2} | " +
-                                        $"Company Worth: {companyWorth:F2} | Profit-to-Worth Ratio: {profitToWorthRatio:F2} | " +
-                                        $"Expansion Threshold: {EXPANSION_THRESHOLD:F2} | Contraction Threshold: {CONTRACTION_THRESHOLD:F2}";
 
-                    log.Info(logMessage);**/
                     int minimumWorkers = math.max(fittingWorkers / 4, 1);
 
                     CompanyFinancials financials = default;
@@ -208,19 +203,21 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                 ComponentType.ReadOnly<UpdateFrame>(),
                 ComponentType.Exclude<ServiceAvailable>()
                 );
-            log.Info("ModifiedIndustrialAISystem created");
+            ModLog.Info(log, "ModifiedIndustrialAISystem created");
         }
 
         protected override void OnUpdate()
         {
             try
             {
-                log.Info("OnUpdate: Starting update cycle");
-
                 uint updateFrame = SimulationUtils.GetUpdateFrame(m_SimulationSystem.frameIndex, kUpdatesPerDay, 16);
-                log.Info($"Current update frame: {updateFrame}");
+                
+                // Only log verbose details when verbose logging is enabled
+                if (ModLog.VerboseEnabled)
+                {
+                    ModLog.Info(log, $"OnUpdate: Starting update cycle, frame: {updateFrame}");
+                }
 
-                log.Info("Scheduling CompanyAITickJob");
                 CompanyAITickJob job = new CompanyAITickJob
                 {
                     EntityType = GetEntityTypeHandle(),
@@ -246,15 +243,17 @@ namespace ProfitBasedIndustryAndOffice.ModSystem
                 };
 
                 Dependency = job.Schedule(m_CompanyQuery, Dependency);
-
-                log.Info("Adding job handles to EndFrameBarrier");
                 m_EndFrameBarrier.AddJobHandleForProducer(Dependency);
 
-                log.Info("OnUpdate completed successfully");
+                if (ModLog.VerboseEnabled)
+                {
+                    ModLog.Info(log, "OnUpdate completed successfully");
+                }
             }
             catch (Exception e)
             {
-                log.Info($"Exception in OnUpdate: {e.Message}\n{e.StackTrace}");
+                ModLog.Error(log, $"Exception in OnUpdate: {e.Message}");
+                Debug.LogException(e);
             }
         }
 
