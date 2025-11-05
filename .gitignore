@@ -365,3 +365,4 @@ MigrationBackup/
 FodyWeavers.xsd
 Library/ilpp.pid
 preprocessed**
+Properties/
